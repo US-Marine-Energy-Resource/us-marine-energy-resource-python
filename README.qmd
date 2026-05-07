@@ -25,15 +25,21 @@ execute:
 dataset — a high-resolution, 3D tidal current hindcast for five US coastal regions,
 generated with the [Finite Volume Community Ocean Model (FVCOM)](https://us-marine-energy-resource.github.io/tidal/high_resolution_hindcast/).
 
-> [!CAUTION]
-> This library is in early development and the API is subject to change. The core functionality of
-> downloading and visualizing tidal hindcast data at specific points is stable, but additional
-> features and datasets are still being added. Please reach out if you have questions or would like
-> to contribute!
+:::{.callout-important}
 
-> [!IMPORTANT]
-> At this time this libary does not support for the U.S. DOE H20 wave energy hindcast dataset.
-> The marine and hydrokinetic toolkit (MHKiT) has a [wave hindcast example](https://mhkit-software.github.io/MHKiT/WPTO_hindcast_example.html) that leverages the [NLR Resource eXtraction tool (rex)](https://github.com/NatLabRockies/rex) to access wave hindcast data.
+This library is in early development and the API is subject to change. The core functionality of
+downloading and visualizing tidal hindcast data at specific points is stable, but additional
+features and datasets are still being added. Please reach out if you have questions or would like
+to contribute!
+
+:::
+
+:::{.callout-note}
+
+At this time this libary does not support for the U.S. DOE H20 wave energy hindcast dataset.
+The marine and hydrokinetic toolkit (MHKiT) has a [wave hindcast example](https://mhkit-software.github.io/MHKiT/WPTO_hindcast_example.html) that leverages the [NLR Resource eXtraction tool (rex)](https://github.com/NatLabRockies/rex) to access wave hindcast data.
+
+:::
 
 
 ## Installation
