@@ -1,7 +1,71 @@
-# Python pycache
-__pycache__/
-*.pyc
+# Python
 
-# MacOS
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+wheels/
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env/
+
+# Testing & coverage
+.pytest_cache/
+.benchmarks/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Type checking & linting caches
+.ruff_cache/
+.mypy_cache/
+.pyright/
+pyrightconfig.json
+
+# Quarto
+
+# Intermediate notebook files generated during render
+README.quarto_ipynb*
+*.quarto_ipynb*
+# Local HTML/PDF preview renders (source of truth is README.qmd)
+readme.html
+README.pdf
+.quarto/
+
+# Project-specific caches
+
+# Local S3/tidal data cache — never commit downloaded hindcast data
+us_tidal_cache/
+
+# Build / packaging
+
+*.whl
+*.tar.gz
+MANIFEST
+
+# macOS
 
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Editors & IDEs
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
