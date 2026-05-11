@@ -1,0 +1,150 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "us-marine-energy-resource"
+version = "0.1.0"
+description = "Download, visualize, and analyze the U.S. DOE Hydropower and Hydrokinetic Office (H2O) High Resolution Tidal Hindcast dataset"
+authors = [
+  {name = "Andrew Simms", email = "andrew.simms@nlr.gov"},
+]
+maintainers = [
+  {name = "Andrew Simms", email = "andrew.simms@nlr.gov"},
+]
+license = {file = "LICENSE"}
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = [
+    "tidal energy",
+    "marine energy",
+    "ocean current",
+    "hydrokinetic",
+    "hindcast",
+    "renewable energy",
+    "H20",
+    "DOE",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "boto3>=1.34",
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "pyarrow>=18.0",
+    "scipy>=1.13",
+    "mhkit[tidal]>=1.0",
+    "matplotlib>=3.9",
+    "seaborn>=0.13",
+    "cmocean>=3.1",
+    "windrose>=1.9",
+    "utide>=0.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/US-Marine-Energy-Resource/us-marine-energy-resource-python"
+Repository = "https://github.com/US-Marine-Energy-Resource/us-marine-energy-resource-python"
+"Bug Tracker" = "https://github.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/issues"
+"Data Source" = "https://data.openei.org/s3_viewer?bucket=marine-energy-data&prefix=us-tidal%2F"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pre-commit>=3.7",
+    "pyright>=1.1.390",
+    "ruff>=0.9",
+    # Type stubs for static analysis
+    "boto3-stubs[s3]>=1.34",
+    "pandas-stubs>=2.2",
+    "pyarrow-stubs>=18.0",
+    "scipy-stubs>=1.13",
+]
+
+analysis = [
+    # Analysis and visualization dependencies
+    "scikit-learn>=1.5",
+]
+
+examples = [
+    # Example notebook dependencies
+    "folium>=0.17",
+    "jupytext>=1.16",
+    "notebook>=7.0",
+    "nbconvert>=7.0",
+    "ipykernel>=6.0",
+]
+
+[project.scripts]
+us-tidal-query = "us_marine_energy_resource.query:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["us_marine_energy_resource"]
+
+# ---------------------------------------------------------------------------
+# Ruff — linter + formatter
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade (modernise typing syntax, f-strings, etc.)
+    "D",    # pydocstyle (NumPy convention enforced below)
+    "N",    # pep8-naming
+    "SIM",  # flake8-simplify
+    "PERF", # perflint — performance anti-patterns
+    "PD",   # pandas-vet — pandas-specific anti-patterns and correctness checks
+    "NPY",  # NumPy-specific rules (deprecated APIs, random generator usage, etc.)
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "D100", # Missing docstring in public module — file-level docstrings used instead
+    "D104", # Missing docstring in public package
+]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = ["F401"]
+
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"] # re-exports are intentional
+"examples/*.py" = ["B018", "E501", "RUF003"]   # bare object expression is a valid Jupyter display idiom; long lines and Unicode in comments are intentional
+"examples/*.ipynb" = ["B018", "E501", "RUF003"] # same for generated notebook
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# ---------------------------------------------------------------------------
+# Pyright — static type checker
+# ---------------------------------------------------------------------------
+[tool.pyright]
+include = ["us_marine_energy_resource"]
+pythonVersion = "3.10"
+pythonPlatform = "All"
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false # boto3-stubs coverage is partial; suppress noise
