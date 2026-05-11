@@ -129,7 +129,7 @@ def plot_tidal_asymmetry(
     settings: PlotSettings | None = None,
     layer: int = 4,
 ) -> Figure:
-    """Analyse and visualise flood vs. ebb tidal current asymmetry.
+    """Analyze and visualize flood vs. ebb tidal current asymmetry.
 
     Four panels: flood/ebb speed histograms, CDFs, polar direction scatter,
     and an asymmetry metrics text box.
@@ -146,7 +146,7 @@ def plot_tidal_asymmetry(
         provided, the DataFrame is automatically trimmed to the requested
         time window before plotting.
     layer : int, optional
-        Sigma layer to analyse. Default 4.
+        Sigma layer to analyze. Default 4.
 
     Returns
     -------

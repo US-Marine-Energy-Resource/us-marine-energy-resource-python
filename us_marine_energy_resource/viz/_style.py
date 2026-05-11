@@ -182,7 +182,7 @@ def _apply_figure_annotations(result: Any, settings: Any) -> None:
     * **title** — calls ``axes[0].set_title(title)`` so the title sits tightly
       above the main axes content regardless of whether a colorbar or other
       secondary axes is present.
-    * **subtitle** — rendered as italic ``fig.text`` near the top centre.
+    * **subtitle** — rendered as italic ``fig.text`` near the top center.
     * **caption** — appended after the source attribution line which appears
       on every figure.
     * **xlabel** / **ylabel** — applied only when the figure has exactly one

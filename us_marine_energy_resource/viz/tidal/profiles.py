@@ -35,7 +35,7 @@ def plot_velocity_profile_with_histograms(
 
     1. **Velocity profile** — horizontal box plots per sigma layer with a
        mean-velocity line overlay.
-    2. **Depth vs. speed scatter** — coloured by direction with quadratic
+    2. **Depth vs. speed scatter** — colored by direction with quadratic
        mean/max fit lines.
     3-5. **Per-layer histograms** of speed, direction, and depth (one
        sub-plot per layer).
@@ -184,7 +184,7 @@ def plot_velocity_profile_with_histograms(
         min_dep: np.ndarray = np.nanmin(all_dep, axis=0)
         mean_vel: np.ndarray = np.nanmean(all_vel, axis=0)
 
-    # --- Colour palette ---
+    # --- Color palette ---
     palette = sns.color_palette()
     bp_color = palette[0]
     bp_edge = palette[0]
@@ -287,7 +287,7 @@ def plot_velocity_profile_with_histograms(
         ax_profile.invert_yaxis()
     ax_profile.grid(True)
 
-    # Panel 2 — scatter: depth vs speed coloured by direction
+    # Panel 2 — scatter: depth vs speed colored by direction
     flat_dep = all_dep.flatten()
     flat_vel = all_vel.flatten()
     flat_dir = all_dir.flatten()
@@ -702,7 +702,7 @@ def plot_power_density_profile(
 
 @styled
 def plot_velocity_shear_profile(df: pd.DataFrame, settings: PlotSettings | None = None) -> Figure:
-    """Analyse and visualise velocity shear across the water column.
+    """Analyze and visualize velocity shear across the water column.
 
     Three panels: mean velocity profile, mean shear profile (with error bars),
     and shear variability box plots.

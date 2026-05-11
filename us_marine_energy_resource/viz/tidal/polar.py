@@ -33,11 +33,11 @@ def plot_current_rose(
     settings : PlotSettings, optional
         See :class:`~us_marine_energy_resource.viz.settings.PlotSettings`.
     layer : int, optional
-        Sigma layer index to visualise. Default 0.
+        Sigma layer index to visualize. Default 0.
     bins : int, optional
         Number of direction bins. Default 16.
     vmax : float, optional
-        Upper bound for velocity colour scaling. Defaults to the data maximum
+        Upper bound for velocity color scaling. Defaults to the data maximum
         rounded up to the nearest 0.1 m/s.
 
     Returns
@@ -130,7 +130,7 @@ def plot_tidal_rose(
     settings : PlotSettings, optional
         See :class:`~us_marine_energy_resource.viz.settings.PlotSettings`.
     layer : int, optional
-        Sigma layer index to visualise. Default 4 (mid-column).
+        Sigma layer index to visualize. Default 4 (mid-column).
 
     Returns
     -------

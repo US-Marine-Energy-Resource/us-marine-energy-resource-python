@@ -127,7 +127,7 @@ def compute_power_density_summary(
         ``vap_sea_water_power_density_layer_{i}`` (used for layer selection
         only), and ``vap_sigma_depth_layer_{i}`` columns.
     layer : int or None, optional
-        Depth layer index (0-based) to analyse.  If ``None``, the layer with
+        Depth layer index (0-based) to analyze.  If ``None``, the layer with
         the highest mean power density is selected automatically.
     rho : float, optional
         Seawater density in kg/m³.  Default is ``1025.0``.

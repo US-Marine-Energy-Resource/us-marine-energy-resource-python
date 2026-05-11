@@ -225,7 +225,7 @@ def _add_jpd_colorbar(
     inset_rect : tuple of float, optional
         ``(x0, y0, width, height)`` in axes-fraction coordinates passed to
         ``ax.inset_axes``.  Default ``(1.05, 0.1, 0.05, 0.8)`` places a slim
-        bar just outside the right edge, vertically centred on the plot circle.
+        bar just outside the right edge, vertically centered on the plot circle.
 
     Returns
     -------

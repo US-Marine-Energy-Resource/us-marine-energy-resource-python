@@ -174,7 +174,7 @@ def plot_sigma_layers_speed(
 ) -> tuple[Figure, Any]:
     """Plot sea water speed across sigma layers over time.
 
-    A depth-time cross-section coloured by current speed using the
+    A depth-time cross-section colored by current speed using the
     ``cmocean thermal`` colormap.
 
     Parameters
@@ -232,7 +232,7 @@ def plot_sigma_layers_direction(
 ) -> tuple[Figure, Any]:
     """Plot sea water direction across sigma layers over time.
 
-    A depth-time cross-section coloured by current direction (°CW from
+    A depth-time cross-section colored by current direction (°CW from
     True North) using the ``cmocean phase`` colormap.
 
     Parameters
@@ -285,7 +285,7 @@ def plot_speed_mesh(
     df: pd.DataFrame,
     settings: PlotSettings | None = None,
 ) -> Figure:
-    """Create a 2-D colour-mesh of current speed over time and depth.
+    """Create a 2-D color-mesh of current speed over time and depth.
 
     Uses ``imshow`` with the viridis colormap, treating each sigma layer as a
     uniform depth band and the time axis as the x-axis.

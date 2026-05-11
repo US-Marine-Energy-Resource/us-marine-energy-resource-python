@@ -53,8 +53,8 @@ class PlotSettings:
         Ignored on multi-panel figures.
     colormap : str or Colormap, optional
         Override the **primary** colormap used by the plot (the main data
-        fill / heatmap colour scale).  Accepts any matplotlib colormap name
-        or object.  Secondary layer-colour palettes are unaffected.
+        fill / heatmap color scale).  Accepts any matplotlib colormap name
+        or object.  Secondary layer-color palettes are unaffected.
         ``None`` uses the function's built-in default.
     colorbar_min : float, optional
         Lower bound for the colorbar color scale.  When set, values below

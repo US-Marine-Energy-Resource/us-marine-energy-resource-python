@@ -370,7 +370,7 @@ def plot_tidal_phase_analysis(
     settings: PlotSettings | None = None,
     layer: int = 4,
 ) -> Figure:
-    """Analyse tidal phases and the current speed-vs-water-level relationship.
+    """Analyze tidal phases and the current speed-vs-water-level relationship.
 
     Three main panels (stacked, shared x-axis):
 
@@ -389,7 +389,7 @@ def plot_tidal_phase_analysis(
     settings : PlotSettings, optional
         See :class:`~us_marine_energy_resource.viz.settings.PlotSettings`.
     layer : int, optional
-        Sigma layer index to analyse. Default 4.
+        Sigma layer index to analyze. Default 4.
 
     Returns
     -------

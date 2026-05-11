@@ -23,7 +23,7 @@ def analyze_power_density(
     rho: float = 1025.0,
     cut_in_speed: float = 0.5,
 ) -> tuple[Figure, dict[str, Any]]:
-    """Analyse tidal current power density with a four-panel diagnostic figure.
+    """Analyze tidal current power density with a four-panel diagnostic figure.
 
     Panels:
 
@@ -41,7 +41,7 @@ def analyze_power_density(
     settings : PlotSettings, optional
         See :class:`~us_marine_energy_resource.viz.settings.PlotSettings`.
     layer : int, optional
-        Sigma layer to analyse.  If ``None``, the layer with the highest mean
+        Sigma layer to analyze.  If ``None``, the layer with the highest mean
         power density is used.
     rho : float, optional
         Water density in kg/m^3.  Default 1025.

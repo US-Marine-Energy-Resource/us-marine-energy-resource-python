@@ -330,9 +330,9 @@ def compute_sigma_bounds_from_layers(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def compute_sigma_bounds_from_seafloor(df: pd.DataFrame) -> pd.DataFrame:
-    """Compute sigma layer centres and bounds from sea floor depth only.
+    """Compute sigma layer centers and bounds from sea floor depth only.
 
-    Derives both 10 sigma layer centre columns
+    Derives both 10 sigma layer center columns
     (``vap_sigma_depth_layer_{0..9}``) and 11 sigma bound columns
     (``vap_sigma_depth_bound_{0..10}``) assuming uniform sigma spacing based
     solely on ``vap_sea_floor_depth``.  Surface elevation is not used.

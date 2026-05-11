@@ -10,7 +10,7 @@ Provides a single-namespace API for data access and visualization:
     fig, stats = tidal.plot_velocity_exceedance(df)
     fig = tidal.generate_tidal_joint_probability(df, sigma_layer=4)
 
-The S3 connection and manifest are initialised lazily on the first call to
+The S3 connection and manifest are initialized lazily on the first call to
 :func:`get_data_at_point` and reused for subsequent calls.
 """
 
@@ -39,7 +39,7 @@ _state: _State | None = None
 
 
 def _ensure_initialized(cache_dir: Path | None = None, verbose: bool = False) -> None:
-    """Initialise S3 cache and manifest on first use.
+    """Initialize S3 cache and manifest on first use.
 
     Parameters
     ----------
@@ -103,7 +103,7 @@ def get_data_at_point(
         nearest grid point. Raises :exc:`ValueError` if exceeded.
     cache_dir : Path, optional
         Override the local cache directory (only used on the very first call
-        before the connection is initialised).
+        before the connection is initialized).
     verbose : bool, optional
         If True, print manifest loading and cache details. Defaults to False.
 
@@ -158,22 +158,17 @@ def get_data_at_point(
 # ---------------------------------------------------------------------------
 from .analysis import (  # noqa: E402
     SiteSummaryMetrics,
-    TurbineConfig,
-    TurbineEnergyMetrics,
-    TurbineLayerInfo,
     calculate_haversine_distance_meters,
     calculate_tidal_levels,
     calculate_tidal_periods,
     collect_site_metrics,
+    compute_power_density,
     compute_power_density_summary,
     compute_sigma_bounds_from_layers,
     compute_sigma_bounds_from_seafloor,
-    compute_turbine_energy_metrics,
-    compute_turbine_power_kw,
     load_parquet,
     prepare_dataframe,
     select_layer_for_depth,
-    select_turbine_layer,
     standardize_metadata,
 )
 from .viz._style import PLOT_CONFIG  # noqa: E402
@@ -184,21 +179,16 @@ from .viz.tidal import (  # noqa: E402
     generate_tidal_joint_probability,
     generate_tidal_site_assessment,
     plot_current_rose,
-    plot_energy_metrics_comparison,
     plot_fft,
     plot_jpd_comparison_grid,
     plot_multi_site_comparison,
     plot_multi_site_exceedance_overlay,
     plot_power_density_profile,
     plot_power_exceedance,
-    plot_power_moving_average_comparison,
     plot_sigma_layers_direction,
     plot_sigma_layers_speed,
     plot_speed_mesh,
     plot_tidal_asymmetry,
-    plot_tidal_cycle_composite,
-    plot_tidal_energy_yield,
-    plot_tidal_energy_yield_simple,
     plot_tidal_exceedance,
     plot_tidal_harmonic_analysis,
     plot_tidal_phase_analysis,
@@ -216,40 +206,31 @@ __all__ = [
     "PLOT_CONFIG",
     "PlotSettings",
     "SiteSummaryMetrics",
-    "TurbineConfig",
-    "TurbineEnergyMetrics",
-    "TurbineLayerInfo",
     "analyze_power_density",
     "calculate_haversine_distance_meters",
     "calculate_tidal_levels",
     "calculate_tidal_periods",
     "collect_site_metrics",
+    "compute_power_density",
     "compute_power_density_summary",
     "compute_sigma_bounds_from_layers",
     "compute_sigma_bounds_from_seafloor",
-    "compute_turbine_energy_metrics",
-    "compute_turbine_power_kw",
     "create_tidal_resource_dashboard",
     "generate_tidal_joint_probability",
     "generate_tidal_site_assessment",
     "get_data_at_point",
     "load_parquet",
     "plot_current_rose",
-    "plot_energy_metrics_comparison",
     "plot_fft",
     "plot_jpd_comparison_grid",
     "plot_multi_site_comparison",
     "plot_multi_site_exceedance_overlay",
     "plot_power_density_profile",
     "plot_power_exceedance",
-    "plot_power_moving_average_comparison",
     "plot_sigma_layers_direction",
     "plot_sigma_layers_speed",
     "plot_speed_mesh",
     "plot_tidal_asymmetry",
-    "plot_tidal_cycle_composite",
-    "plot_tidal_energy_yield",
-    "plot_tidal_energy_yield_simple",
     "plot_tidal_exceedance",
     "plot_tidal_harmonic_analysis",
     "plot_tidal_phase_analysis",
@@ -263,6 +244,5 @@ __all__ = [
     "plot_velocity_shear_profile",
     "prepare_dataframe",
     "select_layer_for_depth",
-    "select_turbine_layer",
     "standardize_metadata",
 ]

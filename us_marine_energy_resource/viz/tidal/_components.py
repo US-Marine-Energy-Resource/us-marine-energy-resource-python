@@ -167,17 +167,17 @@ def _apply_plotting_options(ax: Any, grid: bool = True, legend: bool = False) ->
 
 
 def _get_layer_colors(n_layers: int = _N_LAYERS) -> list[tuple[float, float, float]]:
-    """Return a viridis colour palette for *n_layers* sigma layers.
+    """Return a viridis color palette for *n_layers* sigma layers.
 
     Parameters
     ----------
     n_layers : int
-        Number of colours required.
+        Number of colors required.
 
     Returns
     -------
     list of RGB tuples
-        One colour per layer.
+        One color per layer.
     """
     return sns.color_palette("viridis", n_layers)  # type: ignore[return-value]
 
