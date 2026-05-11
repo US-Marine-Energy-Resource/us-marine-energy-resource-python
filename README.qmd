@@ -1,6 +1,6 @@
 ---
 title: "US Marine Energy Resource"
-subtitle: "Python library access and analysing U.S. marine energy resource characterization data"
+subtitle: "Python library access and analyzing U.S. marine energy resource characterization data"
 format:
   html:
     toc: true
@@ -22,7 +22,7 @@ execute:
 
 `us-marine-energy-resource` is a Python library for accessing the
 [U.S. DOE H2O High Resolution Tidal Hindcast](https://us-marine-energy-resource.github.io/tidal/high_resolution_hindcast/)
-dataset — a high-resolution, 3D tidal current hindcast for five US coastal regions,
+dataset, a high-resolution, 3D tidal current hindcast for five US coastal regions,
 generated with the [Finite Volume Community Ocean Model (FVCOM)](https://us-marine-energy-resource.github.io/tidal/high_resolution_hindcast/).
 
 :::{.callout-important}
@@ -37,7 +37,7 @@ to contribute!
 :::{.callout-note}
 
 At this time this libary does not support for the U.S. DOE H20 wave energy hindcast dataset.
-The marine and hydrokinetic toolkit (MHKiT) has a [wave hindcast example](https://mhkit-software.github.io/MHKiT/WPTO_hindcast_example.html) that leverages the [NLR Resource eXtraction tool (rex)](https://github.com/NatLabRockies/rex) to access wave hindcast data.
+The marine and hydrokinetic toolkit (MHKiT) can access using the `wave.io.hindcast` module showcased in this [wave hindcast example](https://mhkit-software.github.io/MHKiT/WPTO_hindcast_example.html) that leverages the [NLR Resource eXtraction tool (rex)](https://github.com/NatLabRockies/rex) to access wave hindcast data.
 
 :::
 
@@ -55,8 +55,7 @@ listed above and visualize current speed across all 10 depth layers over the ent
 
 The dataset covers a full year at each region at hourly or half-hourly resolution across
 10 terrain-following [sigma layers](https://us-marine-energy-resource.github.io/tidal/high_resolution_hindcast/sigma-layers/)
-from the sea surface to the seafloor. It is the primary dataset for IEC 62600-201 Stage 1
-reconnaissance-level tidal energy site assessment in the US.
+from the sea surface to the seafloor.
 
 | Region                          | Period    | Timestep    | Grid Points |
 | ---                             | ---       | ---         | ---         |
@@ -197,7 +196,7 @@ _, stats = tidal.plot_velocity_exceedance(
 `plot_velocity_profile_with_histograms` produces a five-panel diagnostic overview of
 the full vertical structure of the tidal resource. From left to right: a mean velocity
 profile with per-layer box plots showing spread and whiskers; a depth vs. speed scatter
-coloured by direction with quadratic mean and maximum fit curves; and per-layer histograms
+colored by direction with quadratic mean and maximum fit curves; and per-layer histograms
 of current speed, current direction, and sigma-layer depth. Before plotting, dry time steps
 and anomalously thin ("smushed") sigma layers are removed — the data-quality summary
 in the top-left corner reports what was filtered.
@@ -238,11 +237,17 @@ The time-series parquet (one file per grid point) contains hourly or half-hourly
 for one year with columns for speed, direction, power density, and sigma-layer depth bounds
 at all 10 vertical levels.
 
+Using a downloaded dataframe as an example, the column names for speed, direction, power density,
+and sigma-layer depth bounds at each of the 10 vertical levels are:
+
+```{python}
+df
+```
 
 ## Usage examples
 
 The following sections walk through data retrieval and three core
-visualisations — time series, velocity exceedance, and joint probability
+visualizations — time series, velocity exceedance, and joint probability
 distribution — for six candidate tidal energy sites across the US.
 
 ### Site definitions
@@ -444,7 +449,7 @@ for site in SITES:
 
 ### Current speed across depth and time — all sites
 
-Each panel covers the full hindcast year at one site.  The colourbar range is
+Each panel covers the full hindcast year at one site.  The colorbar range is
 shared across all six: `vmax` is the maximum speed in the dataset, rounded up
 to the nearest 0.5 m/s.
 
@@ -509,7 +514,7 @@ tidal.plot_multi_site_exceedance_overlay(
 
 ### Joint probability distribution — all sites
 
-2 × 3 grid of JPD polar histograms with a shared colour scale.
+2 × 3 grid of JPD polar histograms with a shared color scale.
 
 ```{python}
 site_records_jpd = [
@@ -533,45 +538,87 @@ tidal.plot_jpd_comparison_grid(
 
 ## Command Line Interface
 
-Installing via pip includes 
+Installing via pip includes the `us-tidal-query` CLI for quick spatial lookups directly against the
+manifest — no Python required. The three modes below are run against Cook Inlet, AK.
 
-```bash
-# Point query — returns nearest grid point metadata
-us-tidal-query --lat 60.73 --lon -151.43
+### Point query — nearest grid point
 
-# Area query — returns all grid points within a bounding box
-us-tidal-query --mode area --lat-min 60.7 --lat-max 60.8 \
-               --lon-min -151.5 --lon-max -151.4
-
-# Line query — returns grid points along a transect
-us-tidal-query --mode line --start-lat 60.7 --start-lon -151.4 \
-               --end-lat 60.8 --end-lon -151.5
+```{bash}
+#| output: true
+us-tidal-query --lat 60.73 --lon -151.43 --info-only
 ```
 
----
+### Area query — all grid points in a bounding box
 
-## Low-level API
+```{bash}
+#| output: true
+us-tidal-query --mode area --lat-min 60.7 --lat-max 60.8 \
+               --lon-min -151.5 --lon-max -151.4
+```
 
-`tidal_hindcast` is a facade over lower-level classes that remain accessible
-for finer spatial control or custom processing pipelines:
+### Line query — grid points along a transect
 
-```python
-from us_marine_energy_resource import TidalManifestQuery
+```{bash}
+#| output: true
+us-tidal-query --mode line --start-lat 60.7 --start-lon -151.4 \
+               --end-lat 60.8 --end-lon -151.5 \
+               --max-distance-from-line 0.01
+```
+
+
+## Direct Downloads using the `tidal_hindcast` API
+
+Tidal hindcast data is accessible via multiple functions that can be used independently of the
+plotting functions. This allows users to access the underlying data at specific points, along lines,
+or within rectangular areas. This downloads data to a local cache directory and returns the path to
+the downloaded files, which can be loaded and analyzed with the `load_parquet` and
+`prepare_dataframe` functions in the `analysis` module.
+
+`tidal._state` is initialized lazily on the first `get_data_at_point()` call; call that once
+to populate the shared cache and manifest before accessing `_state` directly.
+
+```{python}
+#| output: true
 from us_marine_energy_resource import tidal_hindcast as tidal
 from us_marine_energy_resource.analysis import load_parquet, prepare_dataframe
-from us_marine_energy_resource.query import find_latest_manifest_s3
 
-# Access the underlying cache and manifest directly
-cache = tidal._state.cache   # initialised on first get_data_at_point() call
-query = tidal._state.manifest
+# Initialize the shared cache and manifest (no-op if already done above).
+tidal.get_data_at_point(lat=60.73, lon=-151.43)
 
-# Spatial queries against the manifest
+# Access the underlying cache and manifest directly.
+cache = tidal._state.cache
+query = tidal._state.query   # TidalManifestQuery instance
+
+# --- Spatial queries against the manifest -----------------------------------
+
+# Single nearest point
 point = query.query_nearest_point(lat=60.73, lon=-151.43)
-area  = query.query_all_within_rectangular_area(60.7, 60.8, -151.5, -151.4)
-line  = query.query_all_on_line(60.7, -151.4, 60.8, -151.5)
 
-# Load a specific grid point's time-series parquet
+# All grid centroids within a bounding box (load_details=False → manifest-only,
+# no per-grid S3 requests — extremely fast)
+area = query.query_all_within_rectangular_area(
+    60.7, 60.8, -151.5, -151.4, load_details=False
+)
+
+# All grid centroids within 0.01° of a transect (load_details=False → fast)
+line = query.query_all_on_line(
+    60.7, -151.4, 60.8, -151.5, max_distance_deg=0.01, load_details=False
+)
+
+print(
+    f"Nearest point : face {point['point']['face_id']}"
+    f"  ({point['point']['lat']:.4f}, {point['point']['lon']:.4f})"
+    f"  —  {point['distance_km']:.3f} km"
+)
+print(f"Area query    : {len(area)} grid centroids in bbox")
+print(f"Line query    : {len(line)} grid centroids along transect")
+```
+
+```{python}
+#| output: true
+# Load a specific grid point's full-year time-series parquet.
 local_path = cache.get(point["point"]["file_path"])
 raw_df, file_meta, var_meta = load_parquet(local_path)
 df = prepare_dataframe(raw_df, file_meta)
+print(f"Loaded {len(df):,} timesteps, {df.shape[1]} columns")
 ```
