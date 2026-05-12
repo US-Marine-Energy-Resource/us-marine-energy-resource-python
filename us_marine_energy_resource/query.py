@@ -239,7 +239,6 @@ def handle_point_query(args, query, s3_cache, benchmark, total_start):
         result = query.query_nearest_point(
             lat=args.lat,
             lon=args.lon,
-            load_details=False,
         )
 
     if result is None:
@@ -301,8 +300,6 @@ def handle_line_query(args, query, s3_cache, benchmark, total_start):
             start_lon=args.start_lon,
             end_lat=args.end_lat,
             end_lon=args.end_lon,
-            max_distance_deg=args.max_distance_from_line,
-            load_details=True,
         )
 
     if not results:
@@ -310,7 +307,7 @@ def handle_line_query(args, query, s3_cache, benchmark, total_start):
         return 1
 
     print("\n" + "-" * 70)
-    print(f"POINTS FOUND ALONG LINE: {len(results)}")
+    print(f"FACES FOUND ALONG LINE: {len(results)}")
     print("-" * 70)
 
     rows = []
@@ -318,12 +315,10 @@ def handle_line_query(args, query, s3_cache, benchmark, total_start):
         cent_lat, cent_lon = r["centroid"]
         rows.append(
             {
-                "Grid ID": r.get("grid_id", "N/A"),
+                "Face ID": r.get("face_id", "N/A"),
                 "Centroid Lat": round(cent_lat, 7),
                 "Centroid Lon": round(cent_lon, 7),
-                "Points": r.get("n_points", 0),
-                "Dist from line (°)": round(r.get("distance_from_line_deg", 0), 4),
-                "Dist along line (°)": round(r.get("distance_along_line_deg", 0), 4),
+                "Frac Along": round(r.get("frac_along", 0), 4),
                 "Location": r.get("location", "unknown"),
             }
         )
@@ -332,7 +327,7 @@ def handle_line_query(args, query, s3_cache, benchmark, total_start):
     print(f"\n{df_results.to_markdown(index=False)}")
 
     if len(results) > args.head:
-        print(f"\n… and {len(results) - args.head} more grids (use --head N to show more)")
+        print(f"\n… and {len(results) - args.head} more faces (use --head N to show more)")
 
     locations = {r.get("location", "unknown") for r in results}
     print(f"\nLocations: {', '.join(sorted(locations))}")
@@ -357,7 +352,6 @@ def handle_area_query(args, query, s3_cache, benchmark, total_start):
             lat_max=args.lat_max,
             lon_min=args.lon_min,
             lon_max=args.lon_max,
-            load_details=True,
         )
 
     if not results:
@@ -367,7 +361,7 @@ def handle_area_query(args, query, s3_cache, benchmark, total_start):
     total_points = sum(r.get("n_points", 0) for r in results)
 
     print("\n" + "-" * 70)
-    print(f"POINTS FOUND IN AREA: {len(results)} grids, {total_points:,} data points")
+    print(f"FACES FOUND IN AREA: {total_points:,} mesh faces")
     print("-" * 70)
 
     rows = []
@@ -375,10 +369,10 @@ def handle_area_query(args, query, s3_cache, benchmark, total_start):
         cent_lat, cent_lon = r["centroid"]
         rows.append(
             {
-                "Grid ID": r.get("grid_id", "N/A"),
+                "Face ID": r.get("face_id", "N/A"),
                 "Centroid Lat": round(cent_lat, 7),
                 "Centroid Lon": round(cent_lon, 7),
-                "Points": r.get("n_points", 0),
+                "Distance (km)": round(r.get("distance_km", 0), 4),
                 "Location": r.get("location", "unknown"),
             }
         )
@@ -387,7 +381,7 @@ def handle_area_query(args, query, s3_cache, benchmark, total_start):
     print(f"\n{df_results.to_markdown(index=False)}")
 
     if len(results) > args.head:
-        print(f"\n… and {len(results) - args.head} more grids (use --head N to show more)")
+        print(f"\n… and {len(results) - args.head} more faces (use --head N to show more)")
 
     locations = {r.get("location", "unknown") for r in results}
     print(f"\nLocations: {', '.join(sorted(locations))}")
@@ -515,12 +509,6 @@ Test coordinates:
     parser.add_argument("--start-lon", type=float, help="Starting longitude for line mode")
     parser.add_argument("--end-lat", type=float, help="Ending latitude for line mode")
     parser.add_argument("--end-lon", type=float, help="Ending longitude for line mode")
-    parser.add_argument(
-        "--max-distance-from-line",
-        type=float,
-        default=0.1,
-        help="Max perpendicular distance from line in degrees (default: 0.1)",
-    )
 
     # Area query arguments
     parser.add_argument("--lat-min", type=float, help="Minimum latitude for area mode")
@@ -641,7 +629,6 @@ Test coordinates:
         print("\nMode: LINE")
         print(f"Start: ({args.start_lat}, {args.start_lon})")
         print(f"End:   ({args.end_lat}, {args.end_lon})")
-        print(f"Max distance from line: {args.max_distance_from_line}°")
     elif args.mode == "area":
         print("\nMode: AREA (bounding box)")
         print(f"Latitude:  {args.lat_min}° to {args.lat_max}°")
@@ -691,7 +678,7 @@ Test coordinates:
         if result is None:
             print("\nERROR: Could not find manifest")
             return 1
-        manifest_path, manifest_version = result
+        manifest_path, _ = result
 
     # Load manifest and create query interface
     print("\nLoading manifest...")
@@ -699,7 +686,7 @@ Test coordinates:
         from us_marine_energy_resource.manifest import TidalManifestQuery
 
     # Pass s3_cache to TidalManifestQuery for on-demand grid file fetching
-    with Timer("Initialize TidalManifestQuery (load JSON + build KDTree)", benchmark):
+    with Timer("Initialize TidalManifestQuery (load JSON)", benchmark):
         query = TidalManifestQuery(manifest_path, s3_cache=s3_cache, verbose=True)
 
     # Execute query based on mode

@@ -1,5 +1,7 @@
 """Tidal harmonic analysis, FFT, and phase analysis plots."""
 
+import warnings
+
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,12 +9,21 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.figure import Figure
 from scipy.fft import fft, fftfreq  # type: ignore[import-untyped]
-from utide import reconstruct, solve  # type: ignore[import-untyped]
 
 from us_marine_energy_resource.viz._style import styled
 from us_marine_energy_resource.viz.settings import PlotSettings
 
 from ._components import _validate_columns
+
+
+def _utide_imports() -> tuple:
+    # utide bundles a .npy constants file compiled with an older numpy that used
+    # align=0 (int) instead of align=False (bool), triggering a NumPy 2.4 warning.
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        warnings.filterwarnings("ignore", category=Warning, module="numpy.*")
+        from utide import reconstruct, solve  # type: ignore[import-untyped]
+    return reconstruct, solve
 
 # Known principal tidal constituents: name → period in hours
 _PRINCIPAL_PERIODS: dict[str, float] = {
@@ -106,7 +117,8 @@ def plot_tidal_harmonic_analysis(
     lat = float(df["lat_center"].iloc[0])
     depth_value = float(df[f"vap_sigma_depth_layer_{layer}"].mean())
 
-    # Harmonic analysis via utide
+    # Harmonic analysis via utide (lazy-loaded to defer the numpy warning)
+    reconstruct, solve = _utide_imports()
     coef = solve(t, u, v, lat=lat, conf_int="linear")
     major_names: list[str] = list(coef["name"][:n_components])
     major_freqs: np.ndarray = coef["aux"]["frq"][:n_components]

@@ -403,34 +403,6 @@ def calculate_tidal_levels(
     }
 
 
-def calculate_haversine_distance_meters(
-    point_a: tuple[float, float],
-    point_b: tuple[float, float],
-) -> float:
-    """Calculate the great-circle distance between two points in metres.
-
-    Delegates to :meth:`TidalManifestQuery.haversine_distance
-    <us_marine_energy_resource.manifest.TidalManifestQuery.haversine_distance>`
-    and converts the result from kilometres to metres.
-
-    Parameters
-    ----------
-    point_a : tuple[float, float]
-        ``(latitude, longitude)`` of the first point in decimal degrees.
-    point_b : tuple[float, float]
-        ``(latitude, longitude)`` of the second point in decimal degrees.
-
-    Returns
-    -------
-    float
-        Distance in metres.
-    """
-    from us_marine_energy_resource.manifest import TidalManifestQuery
-
-    return (
-        TidalManifestQuery.haversine_distance(point_a[0], point_a[1], point_b[0], point_b[1])
-        * 1000.0
-    )
 
 
 class SiteSummaryMetrics(TypedDict):

@@ -30,7 +30,6 @@ from .preprocessing import (
 )
 from .resource import (
     SiteSummaryMetrics,
-    calculate_haversine_distance_meters,
     calculate_tidal_levels,
     calculate_tidal_periods,
     collect_site_metrics,
@@ -42,7 +41,6 @@ from .resource import (
 __all__ = [
     "DepthMode",
     "SiteSummaryMetrics",
-    "calculate_haversine_distance_meters",
     "calculate_tidal_levels",
     "calculate_tidal_periods",
     "collect_site_metrics",

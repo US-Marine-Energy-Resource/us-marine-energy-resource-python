@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "us-marine-energy-resource"
-version = "0.1.0"
+version = "0.2.0"
 description = "Download, visualize, and analyze the U.S. DOE Hydropower and Hydrokinetic Office (H2O) High Resolution Tidal Hindcast dataset"
 authors = [
   {name = "Andrew Simms", email = "andrew.simms@nlr.gov"},
@@ -39,6 +39,7 @@ classifiers = [
 ]
 dependencies = [
     "boto3>=1.34",
+    "duckdb>=1.5.0",
     "numpy>=2.0",
     "pandas>=2.2",
     "pyarrow>=18.0",
@@ -90,6 +91,10 @@ us-tidal-query = "us_marine_energy_resource.query:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["us_marine_energy_resource"]
+artifacts = [
+    "us_marine_energy_resource/data/*.parquet",
+    "us_marine_energy_resource/data/data_index.json",
+]
 
 # ---------------------------------------------------------------------------
 # Ruff — linter + formatter

@@ -158,7 +158,6 @@ def get_data_at_point(
 # ---------------------------------------------------------------------------
 from .analysis import (  # noqa: E402
     SiteSummaryMetrics,
-    calculate_haversine_distance_meters,
     calculate_tidal_levels,
     calculate_tidal_periods,
     collect_site_metrics,
@@ -207,7 +206,6 @@ __all__ = [
     "PlotSettings",
     "SiteSummaryMetrics",
     "analyze_power_density",
-    "calculate_haversine_distance_meters",
     "calculate_tidal_levels",
     "calculate_tidal_periods",
     "collect_site_metrics",
