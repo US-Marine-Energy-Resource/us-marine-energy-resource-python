@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from ._spatial import (
+    _COORD_PRECISION_SCALE,
     AreaOutsideDomainError,
     OutsideDomainError,
     PointOutsideDomainError,
@@ -266,8 +267,8 @@ class TidalManifestQuery:
 
         row = df.iloc[0]
         face_id = str(row["face_id"])
-        lat_val = float(row["lat_fixed_precision"]) / (10 ** self.decimal_places)
-        lon_val = float(row["lon_fixed_precision"]) / (10 ** self.decimal_places)
+        lat_val = float(row["lat_fixed_precision"]) / _COORD_PRECISION_SCALE
+        lon_val = float(row["lon_fixed_precision"]) / _COORD_PRECISION_SCALE
         location = str(row["location"])
         distance_km = float(row["distance_km"])
 
@@ -378,8 +379,8 @@ class TidalManifestQuery:
             results.append({
                 "face_id": str(row["face_id"]),
                 "centroid": (
-                    float(row["lat_fixed_precision"]) / (10 ** self.decimal_places),
-                    float(row["lon_fixed_precision"]) / (10 ** self.decimal_places),
+                    float(row["lat_fixed_precision"]) / _COORD_PRECISION_SCALE,
+                    float(row["lon_fixed_precision"]) / _COORD_PRECISION_SCALE,
                 ),
                 "location": str(row["location"]),
                 "frac_along": float(row["frac_along"]),
