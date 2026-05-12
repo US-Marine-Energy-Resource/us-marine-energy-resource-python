@@ -20,7 +20,7 @@ find_faces_area(coords, location=None)     -> pd.DataFrame
 find_faces_line(coords, location=None)     -> pd.DataFrame
 
 Each function returns a DataFrame with columns:
-  location, face_id, lat_e7, lon_e7,
+  location, face_id, lat_fixed_precision, lon_fixed_precision,
   c1_lat, c1_lon, c2_lat, c2_lon, c3_lat, c3_lon,
   distance_km  (centroid → query point; 0.0 for containing faces)
   [line queries also return: frac_along, distance_from_line_m]
@@ -194,7 +194,7 @@ def _line_wkt_360(coords: Sequence[tuple[float, float]]) -> str:
 # ---------------------------------------------------------------------------
 
 _FACE_COLS = (
-    "location, face_id, lat_e7, lon_e7, "
+    "location, face_id, lat_fixed_precision, lon_fixed_precision, "
     "c1_lat, c1_lon, c2_lat, c2_lon, c3_lat, c3_lon"
 )
 
@@ -206,8 +206,12 @@ ST_MakePolygon(ST_MakeLine(ARRAY[
     ST_Point(c1_lon::DOUBLE, c1_lat::DOUBLE)
 ]))"""
 
-# Bounding-box margin for centroid pre-filter (~0.1° ≈ 11 km).
-_MARGIN_E7 = 1_000_000
+# Coordinate precision: decimal places stored in parquet centroid columns (≈ 1 cm ground resolution).
+_COORD_DECIMAL_PRECISION: int = 7
+_COORD_PRECISION_SCALE: int = 10 ** _COORD_DECIMAL_PRECISION
+
+# Bounding-box pre-filter margin: 0.1° in the same integer coordinate space ≈ 11 km at equator.
+_CENTROID_BBOX_MARGIN: int = _COORD_PRECISION_SCALE // 10
 
 
 def _face_distance_km_expr(lat: float, lon: float) -> str:
@@ -305,24 +309,26 @@ def _resolve_locations(
 # ---------------------------------------------------------------------------
 
 
-def _bbox_clause(lat_e7: int, lon_e7: int, margin: int = _MARGIN_E7) -> str:
+def _bbox_clause(
+    lat_fixed_precision: int, lon_fixed_precision: int, margin: int = _CENTROID_BBOX_MARGIN
+) -> str:
     return (
-        f"lat_e7 BETWEEN {lat_e7 - margin} AND {lat_e7 + margin} "
-        f"AND lon_e7 BETWEEN {lon_e7 - margin} AND {lon_e7 + margin}"
+        f"lat_fixed_precision BETWEEN {lat_fixed_precision - margin} AND {lat_fixed_precision + margin} "
+        f"AND lon_fixed_precision BETWEEN {lon_fixed_precision - margin} AND {lon_fixed_precision + margin}"
     )
 
 
 def _envelope_bbox_clause(
     lat_min: float, lat_max: float, lon_min: float, lon_max: float
 ) -> str:
-    margin = _MARGIN_E7
-    lat_min_e7 = int(lat_min * 1e7) - margin
-    lat_max_e7 = int(lat_max * 1e7) + margin
-    lon_min_e7 = int(lon_min * 1e7) - margin
-    lon_max_e7 = int(lon_max * 1e7) + margin
+    margin = _CENTROID_BBOX_MARGIN
+    lat_min_fp = int(lat_min * _COORD_PRECISION_SCALE) - margin
+    lat_max_fp = int(lat_max * _COORD_PRECISION_SCALE) + margin
+    lon_min_fp = int(lon_min * _COORD_PRECISION_SCALE) - margin
+    lon_max_fp = int(lon_max * _COORD_PRECISION_SCALE) + margin
     return (
-        f"lat_e7 BETWEEN {lat_min_e7} AND {lat_max_e7} "
-        f"AND lon_e7 BETWEEN {lon_min_e7} AND {lon_max_e7}"
+        f"lat_fixed_precision BETWEEN {lat_min_fp} AND {lat_max_fp} "
+        f"AND lon_fixed_precision BETWEEN {lon_min_fp} AND {lon_max_fp}"
     )
 
 
@@ -362,8 +368,8 @@ def find_faces_point(
         con, query_wkt, query_wkt_360, "point", location, lat=lat, lon=lon
     )
 
-    lat_e7 = round(lat * 1e7)
-    lon_e7 = round(lon * 1e7)
+    lat_fixed_precision = round(lat * _COORD_PRECISION_SCALE)
+    lon_fixed_precision = round(lon * _COORD_PRECISION_SCALE)
     dist_expr = _face_distance_km_expr(lat, lon)
     parts: list[pd.DataFrame] = []
 
@@ -374,7 +380,7 @@ def find_faces_point(
                 ST_Contains({_TRIANGLE}, ST_Point({lon}::DOUBLE, {lat}::DOUBLE))
                     AS is_containing
             FROM read_parquet('{_geometry_path(loc)}')
-            WHERE {_bbox_clause(lat_e7, lon_e7)}
+            WHERE {_bbox_clause(lat_fixed_precision, lon_fixed_precision)}
             ORDER BY is_containing DESC, distance_km ASC
             LIMIT 1
         """).df()
