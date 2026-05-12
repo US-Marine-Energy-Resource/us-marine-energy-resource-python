@@ -4,8 +4,8 @@
   "geometry_files": {
     "AK_aleutian_islands": "geometry_AK_aleutian_islands_v1.0.0.parquet",
     "AK_cook_inlet": "geometry_AK_cook_inlet_v1.0.0.parquet",
-    "ME_western_passage": "geometry_ME_western_passage_v1.0.0.parquet",
     "NH_piscataqua_river": "geometry_NH_piscataqua_river_v1.0.0.parquet",
-    "WA_puget_sound": "geometry_WA_puget_sound_v1.0.0.parquet"
+    "WA_puget_sound": "geometry_WA_puget_sound_v1.0.0.parquet",
+    "ME_western_passage": "geometry_ME_western_passage_v1.0.0.parquet"
   }
 }
