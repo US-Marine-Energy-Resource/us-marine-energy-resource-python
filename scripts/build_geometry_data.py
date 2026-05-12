@@ -5,7 +5,7 @@ Fetches the manifest JSON from S3, derives the b4 summary parquet URL for each
 location, then writes to us_marine_energy_resource/data/:
 
   geometry_{location}.parquet   — triangle vertices + centroid integers, sorted
-                                   by (lat_e7, lon_e7) for row-group pruning
+                                   by (lat_fixed_precision, lon_fixed_precision) for row-group pruning
   location_bounds.parquet        — exact outer mesh boundary per location,
                                    computed as the union of all triangles
 
@@ -35,6 +35,7 @@ import urllib.request
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 
 # ---------------------------------------------------------------------------
 # Paths and constants
@@ -99,10 +100,15 @@ def _b4_url(manifest: dict, location: str) -> str:
 # SQL fragments
 # ---------------------------------------------------------------------------
 
-# lat_e7/lon_e7 are extracted from the S3 URI filename to avoid float32
-# precision loss from the lat_center/lon_center columns.
-_GEOMETRY_COLS = """\
-    '{location}'  AS location,
+# Centroid coords are extracted from the S3 URI filename (not lat_center/lon_center)
+# to avoid float32 precision loss. Stored as fixed-point integers at this many decimal
+# places (7 d.p. ≈ 1 cm resolution) for row-group pruning; matches _COORD_DECIMAL_PRECISION
+# in _spatial.py — keep the two in sync.
+_COORD_DECIMAL_PRECISION: int = 7
+_COORD_PRECISION_SCALE: int = 10 ** _COORD_DECIMAL_PRECISION
+
+_GEOMETRY_COLS = f"""\
+    '{{location}}'  AS location,
     face_id,
     element_corner_1_lat  AS c1_lat,
     element_corner_1_lon  AS c1_lon,
@@ -113,13 +119,13 @@ _GEOMETRY_COLS = """\
     CAST(ROUND(
         CAST(regexp_extract(
             full_year_data_s3_uri, '\\.lat=(-?[0-9]+\\.[0-9]+)\\.', 1
-        ) AS DOUBLE) * 1e7
-    ) AS INTEGER) AS lat_e7,
+        ) AS DOUBLE) * {_COORD_PRECISION_SCALE}
+    ) AS INTEGER) AS lat_fixed_precision,
     CAST(ROUND(
         CAST(regexp_extract(
             full_year_data_s3_uri, '\\.lon=(-?[0-9]+\\.[0-9]+)-', 1
-        ) AS DOUBLE) * 1e7
-    ) AS INTEGER) AS lon_e7"""
+        ) AS DOUBLE) * {_COORD_PRECISION_SCALE}
+    ) AS INTEGER) AS lon_fixed_precision"""
 
 _TRIANGLE = """\
 ST_MakePolygon(ST_MakeLine(ARRAY[
@@ -164,7 +170,7 @@ def _build_one_geometry(
         CREATE OR REPLACE TABLE {table} AS
         SELECT {cols}
         FROM read_parquet('{url}')
-        ORDER BY lat_e7, lon_e7
+        ORDER BY lat_fixed_precision, lon_fixed_precision
     """)
     n: int = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]  # type: ignore[index]
     con.execute(f"""
@@ -211,10 +217,10 @@ def _bounds_row(
             ST_AsText(
                 ST_SimplifyPreserveTopology(ST_Union_Agg({triangle}), {tolerance})
             )                                               AS boundary_wkt,
-            MIN(CAST(lat_e7 AS DOUBLE) / 1e7)              AS lat_min,
-            MAX(CAST(lat_e7 AS DOUBLE) / 1e7)              AS lat_max,
-            MIN(CAST(lon_e7 AS DOUBLE) / 1e7)              AS lon_min,
-            MAX(CAST(lon_e7 AS DOUBLE) / 1e7)              AS lon_max,
+            MIN(CAST(lat_fixed_precision AS DOUBLE) / {_COORD_PRECISION_SCALE}) AS lat_min,
+            MAX(CAST(lat_fixed_precision AS DOUBLE) / {_COORD_PRECISION_SCALE}) AS lat_max,
+            MIN(CAST(lon_fixed_precision AS DOUBLE) / {_COORD_PRECISION_SCALE}) AS lon_min,
+            MAX(CAST(lon_fixed_precision AS DOUBLE) / {_COORD_PRECISION_SCALE}) AS lon_max,
             COUNT(*)                                        AS face_count
         FROM {source}
     """).fetchone()
@@ -269,7 +275,8 @@ def build_bounds(
         wkt_len = len(row["boundary_wkt"])
         print(f" {time.time() - t:.1f}s  {row['face_count']:,} faces → {wkt_len:,} chars WKT")
 
-    con.execute("CREATE OR REPLACE TABLE _bounds AS SELECT * FROM rows")
+    bounds_df = pd.DataFrame(rows)
+    con.execute("CREATE OR REPLACE TABLE _bounds AS SELECT * FROM bounds_df")
     con.execute(f"""
         COPY (SELECT * FROM _bounds ORDER BY location)
         TO '{bounds_file.as_posix()}'
