@@ -1,11 +1,12 @@
 """Data loading and preprocessing for tidal energy parquet files."""
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypedDict
 
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
+
 
 _N_LAYERS = 10
 
@@ -368,3 +369,123 @@ def compute_sigma_bounds_from_seafloor(df: pd.DataFrame) -> pd.DataFrame:
             df[f"vap_sigma_depth_bound_{i}"] = sea_floor * (i / 10)
 
     return df
+
+
+# ---------------------------------------------------------------------------
+# Parquet footer — metadata and column statistics without loading row data
+# ---------------------------------------------------------------------------
+
+
+class ColumnStats(TypedDict):
+    """Min/max statistics for one column, aggregated across all row groups."""
+
+    col_min: float | None
+    col_max: float | None
+    null_count: int
+
+
+class ParquetFooterInfo(TypedDict):
+    """Parquet footer metadata: file-level attrs, schema, and column stats."""
+
+    file_meta: dict[str, str]
+    var_meta: dict[str, dict[str, str]]
+    column_stats: dict[str, ColumnStats]
+    num_rows: int
+    num_row_groups: int
+
+
+_FOOTER_SKIP_KEYS = frozenset({"pandas", "ARROW:schema"})
+
+
+def _extract_parquet_footer_info(metadata: Any) -> ParquetFooterInfo:
+    """Extract metadata, schema, and column stats from a PyArrow FileMetaData object.
+
+    Parameters
+    ----------
+    metadata : pyarrow.parquet.FileMetaData
+        Footer metadata object returned by ``pq.read_metadata()``.
+
+    Returns
+    -------
+    ParquetFooterInfo
+        Extracted global metadata, per-variable metadata, per-column min/max
+        statistics aggregated across all row groups, row count, and row group count.
+    """
+    file_meta: dict[str, str] = {}
+    if metadata.metadata:
+        for k, v in metadata.metadata.items():
+            key = k.decode("utf-8") if isinstance(k, bytes) else str(k)
+            if key in _FOOTER_SKIP_KEYS:
+                continue
+            val = v.decode("utf-8") if isinstance(v, bytes) else str(v)
+            file_meta[key] = val
+
+    arrow_schema = metadata.schema.to_arrow_schema()
+
+    var_meta: dict[str, dict[str, str]] = {}
+    for field in arrow_schema:
+        if field.metadata:
+            var_meta[field.name] = {
+                (k.decode("utf-8") if isinstance(k, bytes) else str(k)): (
+                    v.decode("utf-8") if isinstance(v, bytes) else str(v)
+                )
+                for k, v in field.metadata.items()
+            }
+
+    col_names: list[str] = arrow_schema.names
+    column_stats: dict[str, ColumnStats] = {}
+
+    for col_idx, col_name in enumerate(col_names):
+        col_min: float | None = None
+        col_max: float | None = None
+        total_null: int = 0
+
+        for rg_idx in range(metadata.num_row_groups):
+            chunk = metadata.row_group(rg_idx).column(col_idx)
+            stats = chunk.statistics
+            if stats is not None:
+                total_null += stats.null_count or 0
+                if stats.has_min_max:
+                    try:
+                        rg_min = float(stats.min)
+                        rg_max = float(stats.max)
+                        col_min = rg_min if col_min is None else min(col_min, rg_min)
+                        col_max = rg_max if col_max is None else max(col_max, rg_max)
+                    except (TypeError, ValueError):
+                        pass
+
+        column_stats[col_name] = ColumnStats(
+            col_min=col_min,
+            col_max=col_max,
+            null_count=total_null,
+        )
+
+    return ParquetFooterInfo(
+        file_meta=file_meta,
+        var_meta=var_meta,
+        column_stats=column_stats,
+        num_rows=metadata.num_rows,
+        num_row_groups=metadata.num_row_groups,
+    )
+
+
+def read_parquet_footer_info(local_path: str | Path) -> ParquetFooterInfo:
+    """Read parquet footer metadata from a local file without loading row data.
+
+    Reads only the parquet footer (schema + file-level metadata + column
+    statistics) rather than the full file.  Useful for inspecting dataset
+    structure and data ranges without a full download.
+
+    Parameters
+    ----------
+    local_path : str or Path
+        Path to the local parquet file.
+
+    Returns
+    -------
+    ParquetFooterInfo
+        Extracted metadata, per-variable attributes, and per-column min/max
+        statistics aggregated across all row groups.
+    """
+    metadata = pq.read_metadata(str(local_path))
+    return _extract_parquet_footer_info(metadata)
