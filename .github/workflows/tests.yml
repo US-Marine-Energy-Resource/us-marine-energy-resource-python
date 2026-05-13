@@ -16,13 +16,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
 
       - name: Install package with dev dependencies
-        run: pip install -e ".[dev]"
+        run: uv pip install -e ".[dev]"
 
       - name: Run tests
         run: pytest --cov=us_marine_energy_resource
