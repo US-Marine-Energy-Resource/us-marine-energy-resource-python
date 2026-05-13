@@ -147,6 +147,13 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 # ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: marks tests that download data from S3"]
+
+# ---------------------------------------------------------------------------
 # Pyright — static type checker
 # ---------------------------------------------------------------------------
 [tool.pyright]
