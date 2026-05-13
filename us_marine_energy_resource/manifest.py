@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from .cache import S3CacheManager
 
 from ._spatial import (
+    _COORD_DECIMAL_PRECISION,
     _COORD_PRECISION_SCALE,
     AreaOutsideDomainError,
     OutsideDomainError,
@@ -239,6 +240,12 @@ class TidalManifestQuery:
         lat_str, lon_str, face_id_str = point
         lat = float(lat_str)
         lon = float(lon_str)
+
+        # Re-format to the canonical precision used in S3 filenames.
+        # str(float) silently drops trailing zeros (e.g. -122.5481720 → '-122.548172'),
+        # which produces a path that doesn't match the actual S3 object key.
+        lat_str = f"{lat:.{_COORD_DECIMAL_PRECISION}f}"
+        lon_str = f"{lon:.{_COORD_DECIMAL_PRECISION}f}"
 
         multiplier = 10**self.decimal_places
         lat_deg = int(lat)
