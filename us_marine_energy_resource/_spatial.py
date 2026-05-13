@@ -95,6 +95,7 @@ def _bounds_path() -> str:
 
 def _connect() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
+    con.execute("INSTALL spatial;")
     con.execute("LOAD spatial;")
     return con
 
