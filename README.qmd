@@ -494,31 +494,152 @@ tidal.plot_jpd_comparison_grid(
 
 ## Command Line Interface
 
-Installing via pip includes the `us-tidal-query` CLI for quick spatial lookups directly against the
-manifest — no Python required. The three modes below are run against Cook Inlet, AK.
+Installing via pip includes the `us-tidal` CLI for querying and downloading tidal hindcast data
+directly from the command line — no Python required.
+
+### Available options
+
+```bash
+us-tidal --help
+```
+
+```{python}
+#| echo: false
+#| output: true
+import os, re, shutil, subprocess, time
+
+_env = {**os.environ, "NO_COLOR": "1"}
+_demo_cache = "/tmp/us_tidal_readme_demo"
+_SPINNER = set("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
+
+def _run(*args: str) -> str:
+    r = subprocess.run(list(args), capture_output=True, text=True, env=_env)
+    return _clean(r.stdout)
+
+def _clean(text: str) -> str:
+    # Strip OSC 8 hyperlink opening tags (keep display text that follows)
+    # Format: ESC ] 8 ; params ; url ST  where ST is ESC \ or BEL
+    text = re.sub(r"\x1b\]8;[^;]*;[^\x1b\x07]*(?:\x1b\\|\x07)", "", text)
+    # Strip OSC 8 hyperlink closing tags
+    text = re.sub(r"\x1b\]8;;(?:\x1b\\|\x07)", "", text)
+    # Strip any remaining SGR / CSI escape sequences
+    text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", text)
+    # Drop spinner / live-status lines
+    lines = [l for l in text.splitlines() if not any(c in l for c in _SPINNER)]
+    # Replace demo cache path with the real default
+    return "\n".join(lines).replace(_demo_cache, "~/.us_tidal_cache").strip()
+
+print(_run("us-tidal", "--help"))
+```
 
 ### Point query — nearest grid point
 
-```{bash}
+`us-tidal` accepts a positional `lat,lon` argument. Start with `--dry-run` to check the size
+before committing to a download.
+
+```bash
+us-tidal 60.73,-151.43 --dry-run
+```
+
+```{python}
+#| echo: false
 #| output: true
-us-tidal-query --lat 60.73 --lon -151.43 --info-only
+print(_run("us-tidal", "60.73,-151.43", "--dry-run"))
+```
+
+On first run the file is fetched from S3. Subsequent calls read from the local cache with no
+network traffic.
+
+```bash
+# First run — downloads from S3
+us-tidal 60.73,-151.43
+```
+
+```{python}
+#| echo: false
+#| output: true
+shutil.rmtree(_demo_cache, ignore_errors=True)
+t0 = time.perf_counter()
+out = _run("us-tidal", "60.73,-151.43", "--cache-dir", _demo_cache)
+elapsed = time.perf_counter() - t0
+print(out)
+print(f"\n  Elapsed: {elapsed:.1f}s  (S3 download)")
+```
+
+```bash
+# Second run — served from local cache
+us-tidal 60.73,-151.43
+```
+
+```{python}
+#| echo: false
+#| output: true
+t0 = time.perf_counter()
+out = _run("us-tidal", "60.73,-151.43", "--cache-dir", _demo_cache)
+elapsed = time.perf_counter() - t0
+print(out)
+print(f"\n  Elapsed: {elapsed:.1f}s  (local cache)")
 ```
 
 ### Area query — all grid points in a bounding box
 
-```{bash}
-#| output: true
-us-tidal-query --mode area --lat-min 60.7 --lat-max 60.8 \
-               --lon-min -151.5 --lon-max -151.4
+`--bbox` takes `lat_min,lon_min,lat_max,lon_max`. Use `--dry-run` first — bbox queries can match
+thousands of faces.
+
+```bash
+us-tidal --bbox 60.725,-151.445,60.735,-151.425 --dry-run
 ```
 
-### Line query — grid points along a transect
-
-```{bash}
+```{python}
+#| echo: false
 #| output: true
-us-tidal-query --mode line --start-lat 60.7 --start-lon -151.4 \
-               --end-lat 60.8 --end-lon -151.5 \
-               --max-distance-from-line 0.01
+print(_run("us-tidal", "--bbox", "60.725,-151.445,60.735,-151.425", "--dry-run"))
+```
+
+```bash
+# Download all matched faces (~367 MB)
+us-tidal --bbox 60.725,-151.445,60.735,-151.425 --output-dir ./data
+```
+
+### Transect query — grid points along a line
+
+`--coord` defines a waypoint; repeat it to build a multi-segment path. All faces whose triangles
+geometrically intersect the path are returned.
+
+```bash
+us-tidal --coord 60.72,-151.43 --coord 60.75,-151.44 --dry-run
+```
+
+```{python}
+#| echo: false
+#| output: true
+print(_run("us-tidal", "--coord", "60.72,-151.43", "--coord", "60.75,-151.44", "--dry-run"))
+```
+
+```bash
+# Download all matched faces (~139 MB)
+us-tidal --coord 60.72,-151.43 --coord 60.75,-151.44 --output-dir ./data
+```
+
+### Export options
+
+```bash
+# Save parquet files to a directory
+us-tidal 60.73,-151.43 --output-dir ./data
+
+# Export as CSV instead
+us-tidal 60.73,-151.43 --csv --output-dir ./data
+```
+
+### Configuration file
+
+`~/.us_tidal.toml` sets persistent defaults for AWS credentials, cache location, and HPC paths.
+CLI flags always override the config file.
+
+```toml
+# ~/.us_tidal.toml
+aws_profile   = "my-aws-profile"
+cache_dir     = "/scratch/us_tidal_cache"
 ```
 
 
@@ -550,15 +671,14 @@ query = tidal._state.query   # TidalManifestQuery instance
 # Single nearest point
 point = query.query_nearest_point(lat=60.73, lon=-151.43)
 
-# All grid centroids within a bounding box (load_details=False → manifest-only,
-# no per-grid S3 requests — extremely fast)
+# All faces whose triangles intersect the bounding box
 area = query.query_all_within_rectangular_area(
-    60.7, 60.8, -151.5, -151.4, load_details=False
+    60.7, 60.8, -151.5, -151.4
 )
 
-# All grid centroids within 0.01° of a transect (load_details=False → fast)
+# All faces whose triangles are crossed by the line segment
 line = query.query_all_on_line(
-    60.7, -151.4, 60.8, -151.5, max_distance_deg=0.01, load_details=False
+    60.7, -151.4, 60.8, -151.5
 )
 
 print(
