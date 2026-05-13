@@ -2,7 +2,7 @@ name: Render README
 
 on:
   push:
-    branches: ["main", "develop", "feat_improve_tests"]
+    branches: ["main", "develop"]
 
 jobs:
   render:
