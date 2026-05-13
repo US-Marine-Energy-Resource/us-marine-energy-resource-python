@@ -32,7 +32,7 @@ coastal regions, generated with the [Finite Volume Community Ocean Model
 ## Installation
 
 ``` bash
-pip install git+https://github.com/US-Marine-Energy-Resource/us-marine-energy-resource-python.git@main
+pip install us-marine-energy-resource
 ```
 
 ## Tidal Quick Start
@@ -75,6 +75,13 @@ location_name = "Cook Inlet, Near Nikiski, AK"
 df = tidal.get_data_at_point(lat=lat, lon=lon)
 ```
 
+``` python
+image_save_path = "docs/images"
+
+def img(filename: str) -> str:
+    return f"{image_save_path}/{filename}"
+```
+
 `us_marine_energy_resource` has functions to plot the point data at the
 10 uniform depths over time. The underlying data contains speed \[m/s\]
 and direction \[deg cw from True North\] calculated from the underlying
@@ -101,27 +108,27 @@ settings=PlotSettings(
     fig_width=9,
     fig_height=2.5,
     caption=f"Latitude: {lat}, Longitude: {lon}",
-    save_path="docs/images/quickstart-sigma-speed-year.png",
+    save_path=img("quickstart-sigma-speed-year.png"),
 )
 
 tidal.plot_sigma_layers_speed(df, settings=settings)
 ```
 
 ![Full year current speed across sigma layers — Cook Inlet near Nikiski,
-AK](docs/images/quickstart-sigma-speed-year.png)
+AK](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/quickstart-sigma-speed-year.png)
 
 Additionally we can plot direction \[deg clockwise from true north\] at
 all depths over time.
 
 ``` python
 settings.title = settings.title.replace("Current Speed", "Direction [deg cw from True North]")
-settings.save_path = "docs/images/quickstart-sigma-direction-year.png"
+settings.save_path = img("quickstart-sigma-direction-year.png")
 
 tidal.plot_sigma_layers_direction(df, settings=settings)
 ```
 
 ![Full year direction across sigma layers — Cook Inlet near Nikiski,
-AK](docs/images/quickstart-sigma-direction-year.png)
+AK](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/quickstart-sigma-direction-year.png)
 
 It is also possible to zoom into specific start dates within the model
 run. The simplest way to do this is to create time objects from the data
@@ -141,24 +148,24 @@ settings = PlotSettings(
     fig_width=8,
     fig_height=3,
     caption=f"Latitude: {lat}, Longitude: {lon}",
-    save_path="docs/images/quickstart-sigma-speed-3day.png",
+    save_path=img("quickstart-sigma-speed-3day.png"),
 )
 
 tidal.plot_sigma_layers_speed(df, settings=settings)
 ```
 
 ![3-day current speed across sigma layers — Cook Inlet near Nikiski,
-AK](docs/images/quickstart-sigma-speed-3day.png)
+AK](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/quickstart-sigma-speed-3day.png)
 
 ``` python
 settings.title = settings.title.replace("Current Speed", "Direction [deg cw from True North]")
-settings.save_path = "docs/images/quickstart-sigma-direction-3day.png"
+settings.save_path = img("quickstart-sigma-direction-3day.png")
 
 tidal.plot_sigma_layers_direction(df, settings=settings)
 ```
 
 ![3-day direction across sigma layers — Cook Inlet near Nikiski,
-AK](docs/images/quickstart-sigma-direction-3day.png)
+AK](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/quickstart-sigma-direction-3day.png)
 
 The same `df` can be used to visualize tidal joint probability
 distributions (single sigma layer) and velocity exceedance curves
@@ -172,13 +179,14 @@ tidal.generate_tidal_joint_probability(
         title=f"Joint Probability Distribution\n{location_name}\nSigma Layer 4",
         fig_width=8,
         fig_height=8,
-        save_path="docs/images/quickstart-jpd-layer-4.png",
+        save_path=img("quickstart-jpd-layer-4.png"),
     ),
 )
 ```
 
 ![Joint probability distribution at sigma layer 4 — Cook Inlet near
-Nikiski, AK](docs/images/quickstart-jpd-layer-4.png)
+Nikiski,
+AK](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/quickstart-jpd-layer-4.png)
 
 ``` python
 _, stats = tidal.plot_velocity_exceedance(
@@ -188,13 +196,13 @@ _, stats = tidal.plot_velocity_exceedance(
         fig_width=10,
         fig_height=5,
         caption=f"Latitude: {lat}, Longitude: {lon}",
-        save_path="docs/images/quickstart-velocity-exceedance.png",
+        save_path=img("quickstart-velocity-exceedance.png"),
     ),
 )
 ```
 
 ![Velocity exceedance across all sigma layers — Cook Inlet near Nikiski,
-AK](docs/images/quickstart-velocity-exceedance.png)
+AK](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/quickstart-velocity-exceedance.png)
 
 `plot_velocity_profile_with_histograms` produces a five-panel diagnostic
 overview of the full vertical structure of the tidal resource. From left
@@ -214,13 +222,13 @@ tidal.plot_velocity_profile_with_histograms(
         fig_width=10,
         fig_height=16,
         caption=f"Latitude: {lat}, Longitude: {lon}",
-        save_path="docs/images/quickstart-velocity-profile.png",
+        save_path=img("quickstart-velocity-profile.png"),
     ),
 )
 ```
 
 ![Velocity profile with histograms — Cook Inlet near Nikiski,
-AK](docs/images/quickstart-velocity-profile.png)
+AK](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/quickstart-velocity-profile.png)
 
 ## Dataset Variables
 
@@ -337,13 +345,13 @@ tidal.plot_sigma_layers_speed(
         fig_height=3,
         fig_width=8,
         caption=f"Latitude: {lat}, Longitude: {lon}",
-        save_path="docs/images/cook-inlet-sigma-speed.png",
+        save_path=img("cook-inlet-sigma-speed.png"),
     ),
 )
 ```
 
 ![Current speed across sigma layers — Upper Cook Inlet,
-AK](docs/images/cook-inlet-sigma-speed.png)
+AK](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/cook-inlet-sigma-speed.png)
 
 ### Velocity exceedance
 
@@ -359,13 +367,13 @@ _, exc_stats = tidal.plot_velocity_exceedance(
         fig_width=10,
         fig_height=5,
         caption=f"Latitude: {lat}, Longitude: {lon}",
-        save_path="docs/images/cook-inlet-exceedance.png",
+        save_path=img("cook-inlet-exceedance.png"),
     ),
 )
 ```
 
 ![Velocity exceedance across all sigma layers — Upper Cook Inlet,
-AK](docs/images/cook-inlet-exceedance.png)
+AK](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/cook-inlet-exceedance.png)
 
 The returned `exc_stats` dict is keyed by `"Layer {i}"` and contains
 per-layer exceedance speeds at each annotated percentile. We can create
@@ -419,13 +427,13 @@ tidal.generate_tidal_joint_probability(
         fig_width=8,
         fig_height=8,
         caption=f"Latitude: {lat}, Longitude: {lon}",
-        save_path="docs/images/cook-inlet-jpd-layer-4.png",
+        save_path=img("cook-inlet-jpd-layer-4.png"),
     ),
 )
 ```
 
 ![Joint probability distribution at sigma layer 4 — Upper Cook Inlet,
-AK](docs/images/cook-inlet-jpd-layer-4.png)
+AK](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/cook-inlet-jpd-layer-4.png)
 
 ------------------------------------------------------------------------
 
@@ -495,21 +503,23 @@ for site in sites:
             colorbar_max=speed_vmax,
             fig_width=9,
             fig_height=2.5,
-            save_path=f"docs/images/sigma-speed-{slug}.png",
+            save_path=img(f"sigma-speed-{slug}.png"),
         ),
     )
 ```
 
 ![Current speed — Upper Cook Inlet,
-AK](docs/images/sigma-speed-upper-cook-inlet-ak.png) ![Current speed —
-Tacoma Narrows, WA](docs/images/sigma-speed-tacoma-narrows-wa.png)
+AK](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/sigma-speed-upper-cook-inlet-ak.png)
+![Current speed — Tacoma Narrows,
+WA](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/sigma-speed-tacoma-narrows-wa.png)
 ![Current speed — Admiralty Inlet,
-WA](docs/images/sigma-speed-admiralty-inlet-wa.png) ![Current speed —
-UNH Living Bridge, NH](docs/images/sigma-speed-unh-living-bridge-nh.png)
+WA](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/sigma-speed-admiralty-inlet-wa.png)
+![Current speed — UNH Living Bridge,
+NH](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/sigma-speed-unh-living-bridge-nh.png)
 ![Current speed — Moose Island, Western Passage,
-ME](docs/images/sigma-speed-moose-island-western-passage-me.png)
+ME](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/sigma-speed-moose-island-western-passage-me.png)
 ![Current speed — False Pass, Aleutian Islands,
-AK](docs/images/sigma-speed-false-pass-aleutian-islands-ak.png)
+AK](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/sigma-speed-false-pass-aleutian-islands-ak.png)
 
 ### Velocity exceedance — all sites
 
@@ -528,13 +538,13 @@ tidal.plot_multi_site_exceedance_overlay(
         title=f"Velocity Exceedance — All Sites  (analysis depth ≈ {analysis_depth} m {depth_reference})",
         fig_height=3,
         fig_width=8,
-        save_path="docs/images/all-sites-exceedance-overlay.png",
+        save_path=img("all-sites-exceedance-overlay.png"),
     ),
 )
 ```
 
 ![Velocity exceedance overlay — all six
-sites](docs/images/all-sites-exceedance-overlay.png)
+sites](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/all-sites-exceedance-overlay.png)
 
 ### Joint probability distribution — all sites
 
@@ -553,13 +563,13 @@ tidal.plot_jpd_comparison_grid(
         title=f"Joint Probability Distribution — All Sites  (analysis depth ≈ {analysis_depth} m {depth_reference})",
         fig_width=10,
         fig_height=13,
-        save_path="docs/images/all-sites-jpd-grid.png",
+        save_path=img("all-sites-jpd-grid.png"),
     ),
 )
 ```
 
 ![Joint probability distribution grid — all six
-sites](docs/images/all-sites-jpd-grid.png)
+sites](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/all-sites-jpd-grid.png)
 
 ## Command Line Interface
 
@@ -726,7 +736,7 @@ us-tidal 60.73,-151.43
 
       ✓  1 file cached at ~/.us_tidal_cache/marine-energy-data
 
-      Elapsed: 2.0s  (S3 download)
+      Elapsed: 2.3s  (S3 download)
 
 ``` bash
 # Second run — served from local cache
@@ -752,7 +762,7 @@ us-tidal 60.73,-151.43
 
       ✓  1 file cached at ~/.us_tidal_cache/marine-energy-data
 
-      Elapsed: 1.0s  (local cache)
+      Elapsed: 1.1s  (local cache)
 
 ### Area query — all grid points in a bounding box
 
