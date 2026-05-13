@@ -17,6 +17,7 @@ import contextlib
 import json
 import os
 import threading
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
@@ -351,6 +352,140 @@ class S3CacheManager:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             self.etag_cache = {}
             self._save_etag_cache()
+
+    def object_size(self, relative_path: str) -> int | None:
+        """Return the S3 object size in bytes via HEAD request without downloading.
+
+        Parameters
+        ----------
+        relative_path : str
+            Path relative to the S3 prefix.
+
+        Returns
+        -------
+        int or None
+            Content-Length in bytes, or ``None`` if the object is inaccessible.
+        """
+        s3_key = self._get_s3_key(relative_path)
+        try:
+            response = self.s3.head_object(Bucket=self.bucket, Key=s3_key)
+            return int(response.get("ContentLength", 0))
+        except ClientError:
+            return None
+
+    def estimate_sizes(
+        self,
+        relative_paths: list[str],
+        max_workers: int = 8,
+    ) -> dict[str, int]:
+        """Return S3 object sizes via parallel HEAD requests without downloading.
+
+        Parameters
+        ----------
+        relative_paths : list[str]
+            Paths relative to the S3 prefix.
+        max_workers : int, default 8
+            Number of concurrent HEAD request threads.
+
+        Returns
+        -------
+        dict[str, int]
+            Mapping of ``relative_path → size_in_bytes`` for each path that
+            returned a valid response.  Inaccessible paths are omitted.
+        """
+        results: dict[str, int] = {}
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            future_to_path = {pool.submit(self.object_size, p): p for p in relative_paths}
+            for future in as_completed(future_to_path):
+                rel = future_to_path[future]
+                size = future.result()
+                if size is not None:
+                    results[rel] = size
+        return results
+
+    def get_parquet_footer_info(self, relative_path: str) -> dict[str, Any]:
+        """Read parquet footer metadata via S3 range requests, caching result as JSON.
+
+        Uses ``s3fs`` (boto3-backed) to open the remote file and passes the
+        handle to ``pq.read_metadata``, which issues only the 1–2 range GETs
+        needed to fetch the footer.  On subsequent calls the JSON cache is used
+        with no S3 access.
+
+        Parameters
+        ----------
+        relative_path : str
+            Path relative to the S3 prefix (same format as :meth:`get`).
+
+        Returns
+        -------
+        dict
+            A :class:`~us_marine_energy_resource.analysis.preprocessing.ParquetFooterInfo`
+            -shaped dict with ``file_meta``, ``var_meta``, ``column_stats``,
+            ``num_rows``, and ``num_row_groups``.
+        """
+        info_cache_path = self._get_local_path(relative_path + ".info.json")
+
+        if info_cache_path.exists():
+            try:
+                with open(info_cache_path) as f:
+                    return json.load(f)  # type: ignore[no-any-return]
+            except (OSError, json.JSONDecodeError):
+                info_cache_path.unlink(missing_ok=True)
+
+        import s3fs
+        import pyarrow.parquet as pq
+
+        from .analysis.preprocessing import _extract_parquet_footer_info
+
+        if self.aws_profile:
+            fs = s3fs.S3FileSystem(profile=self.aws_profile)
+        else:
+            fs = s3fs.S3FileSystem(anon=True)
+
+        s3_path = f"s3://{self.bucket}/{self._get_s3_key(relative_path)}"
+        with fs.open(s3_path, "rb") as f:
+            metadata = pq.read_metadata(f)
+
+        info = _extract_parquet_footer_info(metadata)
+
+        info_cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(info_cache_path, "w") as f:
+            json.dump(info, f)
+
+        return dict(info)
+
+    def get_many_parquet_footer_infos(
+        self,
+        relative_paths: list[str],
+        max_workers: int = 8,
+    ) -> dict[str, dict[str, Any]]:
+        """Fetch parquet footer info for multiple files in parallel.
+
+        Parameters
+        ----------
+        relative_paths : list of str
+            Paths relative to the S3 prefix.
+        max_workers : int, default 8
+            Number of concurrent fetch threads.
+
+        Returns
+        -------
+        dict[str, dict]
+            Mapping of ``relative_path → footer_info`` for every successfully
+            fetched path.  Failed paths are silently omitted.
+        """
+        results: dict[str, dict[str, Any]] = {}
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            future_to_path = {
+                pool.submit(self.get_parquet_footer_info, p): p for p in relative_paths
+            }
+            for future in as_completed(future_to_path):
+                rel = future_to_path[future]
+                try:
+                    results[rel] = future.result()
+                except Exception as exc:
+                    warnings.warn(f"Could not read parquet footer for {rel}: {exc}", stacklevel=2)
+        return results
 
     def cache_stats(self) -> dict[str, Any]:
         """

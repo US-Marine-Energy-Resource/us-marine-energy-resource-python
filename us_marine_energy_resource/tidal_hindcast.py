@@ -54,8 +54,7 @@ def _ensure_initialized(cache_dir: Path | None = None, verbose: bool = False) ->
 
     # Defer heavy imports to keep module-level import fast.
     from .cache import S3CacheManager
-    from .manifest import TidalManifestQuery
-    from .query import find_latest_manifest_s3
+    from .manifest import TidalManifestQuery, find_latest_manifest_s3
 
     cache = S3CacheManager(
         bucket="marine-energy-data",
@@ -63,7 +62,7 @@ def _ensure_initialized(cache_dir: Path | None = None, verbose: bool = False) ->
         cache_dir=cache_dir,
     )
 
-    result = find_latest_manifest_s3(cache, verbose=verbose)
+    result = find_latest_manifest_s3(cache)
     if result is None:
         raise RuntimeError(
             "Could not locate a tidal hindcast manifest on S3. "
