@@ -17,11 +17,14 @@ Quick start::
 """
 
 from .preprocessing import (
+    ColumnStats,
     DepthMode,
+    ParquetFooterInfo,
     compute_sigma_bounds_from_layers,
     compute_sigma_bounds_from_seafloor,
     load_parquet,
     prepare_dataframe,
+    read_parquet_footer_info,
     sigma_depth_axis_label,
     sigma_depth_scalar,
     sigma_depths_array,
@@ -29,27 +32,38 @@ from .preprocessing import (
     standardize_metadata,
 )
 from .resource import (
+    CategoryInfo,
     SiteSummaryMetrics,
+    StatRow,
     calculate_tidal_levels,
     calculate_tidal_periods,
+    categorize_columns,
     collect_site_metrics,
+    compute_footer_stats,
     compute_power_density,
     compute_power_density_summary,
     select_layer_for_depth,
 )
 
 __all__ = [
+    "CategoryInfo",
+    "ColumnStats",
     "DepthMode",
+    "ParquetFooterInfo",
     "SiteSummaryMetrics",
+    "StatRow",
     "calculate_tidal_levels",
     "calculate_tidal_periods",
+    "categorize_columns",
     "collect_site_metrics",
+    "compute_footer_stats",
     "compute_power_density",
     "compute_power_density_summary",
     "compute_sigma_bounds_from_layers",
     "compute_sigma_bounds_from_seafloor",
     "load_parquet",
     "prepare_dataframe",
+    "read_parquet_footer_info",
     "select_layer_for_depth",
     "sigma_depth_axis_label",
     "sigma_depth_scalar",

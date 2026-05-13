@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from typing import Any, TypedDict
 
 import numpy as np
@@ -478,3 +479,278 @@ def collect_site_metrics(
         "lat": lat,
         "lon": lon,
     }
+
+
+# ---------------------------------------------------------------------------
+# Column categorization and footer-based statistics
+# ---------------------------------------------------------------------------
+
+# (display_name, filter_key, column_prefix, units, is_directional)
+_LAYER_CATEGORIES: list[tuple[str, str, str, str, bool]] = [
+    ("Speed",         "speed",     "vap_sea_water_speed_layer_",          "m/s",  False),
+    ("Direction",     "direction", "vap_sea_water_to_direction_layer_",   "°",    True),
+    ("Power Density", "power",     "vap_sea_water_power_density_layer_",  "W/m²", False),
+    ("Depth",         "depth",     "vap_sigma_depth_layer_",              "m",    False),
+    ("Height",        "depth",     "vap_sigma_height_layer_",             "m",    False),
+]
+
+# (display_name, filter_key, column_names, units)
+_SCALAR_CATEGORIES: list[tuple[str, str, list[str], str]] = [
+    ("Water Level", "depth",    ["vap_surface_elevation"], "m"),
+    ("Sea Floor",   "depth",    ["vap_sea_floor_depth"],   "m"),
+    ("Position",    "position", ["lat", "lon"],             "°"),
+]
+
+
+class CategoryInfo(TypedDict):
+    """Metadata about one group of related columns."""
+
+    name: str
+    filter_key: str
+    columns: list[str]
+    n: int
+    units: str
+    is_directional: bool
+    is_layered: bool
+    prefix: str
+    pattern: str
+
+
+class StatRow(TypedDict):
+    """One row in the footer-statistics display table."""
+
+    category: str
+    filter_key: str
+    layer_label: str
+    col_min: float | None
+    col_max: float | None
+    units: str
+    is_directional: bool
+
+
+def categorize_columns(columns: Sequence[str]) -> list[CategoryInfo]:
+    """Group DataFrame column names by physical category.
+
+    Matches columns against the known H2O tidal hindcast naming conventions
+    and returns a list of :class:`CategoryInfo` records suitable for display.
+
+    Parameters
+    ----------
+    columns : sequence of str
+        Column names present in the parquet file.
+
+    Returns
+    -------
+    list of CategoryInfo
+        One entry per detected category, in a fixed display order.
+        Categories whose columns are entirely absent from *columns* are omitted.
+    """
+    available = set(columns)
+    result: list[CategoryInfo] = []
+
+    for display_name, filter_key, prefix, units, is_dir in _LAYER_CATEGORIES:
+        cols = [f"{prefix}{i}" for i in range(_N_LAYERS) if f"{prefix}{i}" in available]
+        if not cols:
+            continue
+        n = len(cols)
+        pattern = f"{prefix}0 … _{n - 1}" if n > 1 else cols[0]
+        result.append(
+            CategoryInfo(
+                name=display_name,
+                filter_key=filter_key,
+                columns=cols,
+                n=n,
+                units=units,
+                is_directional=is_dir,
+                is_layered=True,
+                prefix=prefix,
+                pattern=pattern,
+            )
+        )
+
+    for display_name, filter_key, col_names, units in _SCALAR_CATEGORIES:
+        cols = [c for c in col_names if c in available]
+        if not cols:
+            continue
+        result.append(
+            CategoryInfo(
+                name=display_name,
+                filter_key=filter_key,
+                columns=cols,
+                n=len(cols),
+                units=units,
+                is_directional=False,
+                is_layered=False,
+                prefix="",
+                pattern=", ".join(cols),
+            )
+        )
+
+    return result
+
+
+def _aggregate_col_stats(
+    footer_infos: list[dict[str, Any]],
+    col: str,
+) -> tuple[float | None, float | None]:
+    """Return global min/max for *col* across all footer infos."""
+    col_min: float | None = None
+    col_max: float | None = None
+    for info in footer_infos:
+        s = info["column_stats"].get(col)
+        if s:
+            if s["col_min"] is not None:
+                col_min = s["col_min"] if col_min is None else min(col_min, s["col_min"])
+            if s["col_max"] is not None:
+                col_max = s["col_max"] if col_max is None else max(col_max, s["col_max"])
+    return col_min, col_max
+
+
+def _aggregate_depth_avg(
+    footer_infos: list[dict[str, Any]],
+    prefix: str,
+) -> tuple[float | None, float | None]:
+    """Return the depth-averaged min/max across all 10 sigma layers and all files."""
+    layer_mins: list[float] = []
+    layer_maxes: list[float] = []
+    for i in range(_N_LAYERS):
+        mn, mx = _aggregate_col_stats(footer_infos, f"{prefix}{i}")
+        if mn is not None:
+            layer_mins.append(mn)
+        if mx is not None:
+            layer_maxes.append(mx)
+    col_min = float(np.mean(layer_mins)) if layer_mins else None
+    col_max = float(np.mean(layer_maxes)) if layer_maxes else None
+    return col_min, col_max
+
+
+def _find_layer_for_depth(
+    footer_infos: list[dict[str, Any]],
+    target_depth: float,
+) -> int:
+    """Find the sigma layer index whose midpoint depth is closest to *target_depth*.
+
+    Uses ``vap_sigma_depth_layer_{i}`` column statistics (min/max midpoint)
+    from the footer as a proxy for mean depth.  Approximate — actual layer
+    depths vary with tidal stage and location.
+    """
+    midpoints: list[float] = []
+    for i in range(_N_LAYERS):
+        col = f"vap_sigma_depth_layer_{i}"
+        mn, mx = _aggregate_col_stats(footer_infos, col)
+        if mn is not None and mx is not None:
+            midpoints.append((mn + mx) / 2.0)
+        else:
+            midpoints.append(float("nan"))
+
+    diffs = [
+        abs(m - target_depth) if not np.isnan(m) else float("inf") for m in midpoints
+    ]
+    return int(np.argmin(diffs))
+
+
+def _layer_label(layer: int) -> str:
+    if layer == 0:
+        return "0 (surf.)"
+    if layer == _N_LAYERS - 1:
+        return f"{layer} (bed)"
+    return str(layer)
+
+
+def compute_footer_stats(
+    footer_infos: list[dict[str, Any]],
+    categories: list[CategoryInfo],
+    layers: list[int],
+    depth_target: float | None = None,
+    depth_avg: bool = False,
+) -> tuple[list[StatRow], str]:
+    """Compute per-category statistics from parquet footer row-group data.
+
+    Statistics are derived entirely from the parquet footer (row-group min/max),
+    so no full file download is required.  For multiple files the global min
+    and max across all files are returned.
+
+    Parameters
+    ----------
+    footer_infos : list of dict
+        One :class:`ParquetFooterInfo`-shaped dict per matched parquet file.
+    categories : list of CategoryInfo
+        Column categories to include (as returned by :func:`categorize_columns`).
+    layers : list of int
+        Sigma layer indices to display (0 = surface, 9 = near-bed).
+    depth_target : float, optional
+        If provided, find and use the sigma layer nearest to this depth (m from
+        surface). Overrides *layers*.
+    depth_avg : bool
+        If True, average statistics across all 10 sigma layers.
+
+    Returns
+    -------
+    tuple of (list[StatRow], str)
+        Stat rows for the display table and a human-readable layer-selection label.
+    """
+    if depth_avg:
+        resolved: list[int] = []
+        layer_label_str = "Depth Average (all layers)"
+    elif depth_target is not None:
+        best = _find_layer_for_depth(footer_infos, depth_target)
+        resolved = [best]
+        layer_label_str = f"~{depth_target:.1f} m (layer {best})"
+    else:
+        resolved = layers if layers else [0]
+        if resolved == [0]:
+            layer_label_str = "Surface Layer (layer 0)"
+        elif len(resolved) == 1:
+            layer_label_str = f"Layer {resolved[0]}"
+        else:
+            layer_label_str = f"Layers {', '.join(map(str, resolved))}"
+
+    rows: list[StatRow] = []
+
+    for cat in categories:
+        if cat["is_layered"]:
+            if depth_avg:
+                col_min, col_max = _aggregate_depth_avg(footer_infos, cat["prefix"])
+                rows.append(
+                    StatRow(
+                        category=cat["name"],
+                        filter_key=cat["filter_key"],
+                        layer_label="avg",
+                        col_min=col_min,
+                        col_max=col_max,
+                        units=cat["units"],
+                        is_directional=cat["is_directional"],
+                    )
+                )
+            else:
+                for lyr in resolved:
+                    col = f"{cat['prefix']}{lyr}"
+                    col_min, col_max = _aggregate_col_stats(footer_infos, col)
+                    rows.append(
+                        StatRow(
+                            category=cat["name"],
+                            filter_key=cat["filter_key"],
+                            layer_label=_layer_label(lyr),
+                            col_min=col_min,
+                            col_max=col_max,
+                            units=cat["units"],
+                            is_directional=cat["is_directional"],
+                        )
+                    )
+        else:
+            for col in cat["columns"]:
+                col_min, col_max = _aggregate_col_stats(footer_infos, col)
+                lbl = col if len(cat["columns"]) > 1 else "—"
+                rows.append(
+                    StatRow(
+                        category=cat["name"],
+                        filter_key=cat["filter_key"],
+                        layer_label=lbl,
+                        col_min=col_min,
+                        col_max=col_max,
+                        units=cat["units"],
+                        is_directional=False,
+                    )
+                )
+
+    return rows, layer_label_str

@@ -260,59 +260,16 @@ distribution — for six candidate tidal energy sites across the US.
 ### Site definitions
 
 ``` python
-from dataclasses import dataclass
-
-
-@dataclass
-class Site:
-    """A tidal energy candidate site."""
-
-    name: str
-    lat: float
-    lon: float
-    region: str
-
-
-SITES: list[Site] = [
-    Site(
-        "Upper Cook Inlet, AK",
-        lat=60.735016,
-        lon=-151.431396,
-        region="Cook Inlet, Alaska",
-    ),
-    Site(
-        "Tacoma Narrows, WA",
-        lat=47.270191,
-        lon=-122.548172,
-        region="Puget Sound, Washington",
-    ),
-    Site(
-        "Admiralty Inlet, WA",
-        lat=48.173931,
-        lon=-122.774963,
-        region="Puget Sound, Washington",
-    ),
-    Site(
-        "UNH Living Bridge, NH",
-        lat=43.079498,
-        lon=-70.752319,
-        region="Piscataqua River, New Hampshire",
-    ),
-    Site(
-        "Moose Island, Western Passage, ME",
-        lat=44.920837,
-        lon=-66.988762,
-        region="Western Passage, Maine",
-    ),
-    Site(
-        "False Pass, Aleutian Islands, AK",
-        lat=54.803799,
-        lon=-163.364441,
-        region="Aleutian Islands, Alaska",
-    ),
+sites = [
+    {"label": "Upper Cook Inlet, AK",            "lat": 60.735016,  "lon": -151.431396},
+    {"label": "Tacoma Narrows, WA",              "lat": 47.270191,  "lon": -122.548172},
+    {"label": "Admiralty Inlet, WA",             "lat": 48.173931,  "lon": -122.774963},
+    {"label": "UNH Living Bridge, NH",           "lat": 43.079498,  "lon": -70.752319},
+    {"label": "Moose Island, Western Passage, ME", "lat": 44.920837, "lon": -66.988762},
+    {"label": "False Pass, Aleutian Islands, AK", "lat": 54.803799,  "lon": -163.364441},
 ]
 
-PRIMARY = SITES[0]
+cook_inlet = sites[0]
 ```
 
 ### Load data for all sites
@@ -324,12 +281,12 @@ direction, power density, and sigma-layer depth bounds at all 10
 vertical levels.
 
 ``` python
-site_data: dict[str, pd.DataFrame] = {}
+site_data = {}
 
-for site in SITES:
-    print(f"Loading {site.name} …")
-    site_data[site.name] = tidal.get_data_at_point(site.lat, site.lon)
-    site_df = site_data[site.name]
+for site in sites:
+    print(f"Loading {site['label']} …")
+    site_data[site["label"]] = tidal.get_data_at_point(site["lat"], site["lon"])
+    site_df = site_data[site["label"]]
     date_range = f"{site_df.index[0].date()} → {site_df.index[-1].date()}"
     print(f"  {len(site_df):,} timesteps  ({date_range})\n")
 ```
@@ -370,13 +327,13 @@ vertical shear between the fast surface and slower near-bed layers are
 all directly visible.
 
 ``` python
-df_primary = site_data[PRIMARY.name]
-lat, lon = PRIMARY.lat, PRIMARY.lon
+df_primary = site_data[cook_inlet["label"]]
+lat, lon = cook_inlet["lat"], cook_inlet["lon"]
 
 tidal.plot_sigma_layers_speed(
     df_primary,
     settings=PlotSettings(
-        title=f"Current Speed Across Sigma Layers — {PRIMARY.name}",
+        title=f"Current Speed Across Sigma Layers — {cook_inlet['label']}",
         fig_height=3,
         fig_width=8,
         caption=f"Latitude: {lat}, Longitude: {lon}",
@@ -398,7 +355,7 @@ hindcast record — the key inputs for turbine capacity-factor estimates.
 _, exc_stats = tidal.plot_velocity_exceedance(
     df_primary,
     settings=PlotSettings(
-        title=f"Velocity Exceedance — {PRIMARY.name}",
+        title=f"Velocity Exceedance — {cook_inlet['label']}",
         fig_width=10,
         fig_height=5,
         caption=f"Latitude: {lat}, Longitude: {lon}",
@@ -458,7 +415,7 @@ tidal.generate_tidal_joint_probability(
     df_primary,
     sigma_layer=4,
     settings=PlotSettings(
-        title=f"Joint Probability Distribution — {PRIMARY.name}",
+        title=f"Joint Probability Distribution — {cook_inlet['label']}",
         fig_width=8,
         fig_height=8,
         caption=f"Latitude: {lat}, Longitude: {lon}",
@@ -475,7 +432,7 @@ AK](docs/images/cook-inlet-jpd-layer-4.png)
 ## All-sites comparison
 
 The following three visualizations compare the same plot type across all
-six candidate sites. A single `ANALYSIS_DEPTH` variable controls the
+six candidate sites. A single `analysis_depth` variable controls the
 nominal depth used for layer selection, keeping the exceedance and JPD
 panels on an apples-to-apples basis.
 
@@ -484,20 +441,20 @@ panels on an apples-to-apples basis.
 ``` python
 import math
 
-ANALYSIS_DEPTH = 10.0  # m — nominal analysis depth
-ANALYSIS_DEPTH_RELATIVE_TO = "surface"  # "surface" or "sea_floor"
+analysis_depth = 10.0  # m — nominal analysis depth
+depth_reference = "surface"  # "surface" or "sea_floor"
 
-# Select the sigma layer closest to ANALYSIS_DEPTH for each site.
-site_layers: dict[str, tuple[int, float]] = {}
-for site in SITES:
+# Select the sigma layer closest to analysis_depth for each site.
+site_layers = {}
+for site in sites:
     layer, actual_depth = tidal.select_layer_for_depth(
-        site_data[site.name],
-        ANALYSIS_DEPTH,
-        relative_to=ANALYSIS_DEPTH_RELATIVE_TO,
+        site_data[site["label"]],
+        analysis_depth,
+        relative_to=depth_reference,
     )
-    site_layers[site.name] = (layer, actual_depth)
+    site_layers[site["label"]] = (layer, actual_depth)
     print(
-        f"{site.name:<40} layer {layer}  "
+        f"{site['label']:<40} layer {layer}  "
         f"(mean depth {actual_depth:.1f} m)"
     )
 ```
@@ -519,22 +476,22 @@ rounded up to the nearest 0.5 m/s.
 # Compute shared "nice max" colorbar limit.
 all_max_speeds = [
     float(
-        site_data[site.name][
+        site_data[site["label"]][
             [f"vap_sea_water_speed_layer_{i}" for i in range(10)]
         ].max().max()
     )
-    for site in SITES
+    for site in sites
 ]
 speed_vmax = math.ceil(max(all_max_speeds) / 0.5) * 0.5
 
-for site in SITES:
-    slug = site.name.lower().replace(", ", "-").replace(" ", "-").replace(".", "")
-    site_df = site_data[site.name]
+for site in sites:
+    slug = site["label"].lower().replace(", ", "-").replace(" ", "-").replace(".", "")
+    site_df = site_data[site["label"]]
     tidal.plot_sigma_layers_speed(
         site_df,
         settings=PlotSettings(
-            title=f"Current Speed Across Sigma Layers — {site.name}",
-            caption=f"Lat: {site.lat}, Lon: {site.lon}",
+            title=f"Current Speed Across Sigma Layers — {site['label']}",
+            caption=f"Lat: {site['lat']}, Lon: {site['lon']}",
             colorbar_max=speed_vmax,
             fig_width=9,
             fig_height=2.5,
@@ -559,16 +516,16 @@ AK](docs/images/sigma-speed-false-pass-aleutian-islands-ak.png)
 All six sites on one figure at their respective analysis-depth layers.
 
 ``` python
-TAB10 = plt.cm.tab10.colors  # type: ignore[attr-defined]
+colors = plt.cm.tab10.colors
 site_records_exc = [
-    (site.name, site_data[site.name], site_layers[site.name][0], TAB10[i])
-    for i, site in enumerate(SITES)
+    (site["label"], site_data[site["label"]], site_layers[site["label"]][0], colors[i])
+    for i, site in enumerate(sites)
 ]
 
 tidal.plot_multi_site_exceedance_overlay(
     site_records_exc,
     settings=PlotSettings(
-        title=f"Velocity Exceedance — All Sites  (analysis depth ≈ {ANALYSIS_DEPTH} m {ANALYSIS_DEPTH_RELATIVE_TO})",
+        title=f"Velocity Exceedance — All Sites  (analysis depth ≈ {analysis_depth} m {depth_reference})",
         fig_height=3,
         fig_width=8,
         save_path="docs/images/all-sites-exceedance-overlay.png",
@@ -585,15 +542,15 @@ sites](docs/images/all-sites-exceedance-overlay.png)
 
 ``` python
 site_records_jpd = [
-    (site.name, site_data[site.name], site_layers[site.name][0])
-    for site in SITES
+    (site["label"], site_data[site["label"]], site_layers[site["label"]][0])
+    for site in sites
 ]
 
 tidal.plot_jpd_comparison_grid(
     site_records_jpd,
     ncols=2,
     settings=PlotSettings(
-        title=f"Joint Probability Distribution — All Sites  (analysis depth ≈ {ANALYSIS_DEPTH} m {ANALYSIS_DEPTH_RELATIVE_TO})",
+        title=f"Joint Probability Distribution — All Sites  (analysis depth ≈ {analysis_depth} m {depth_reference})",
         fig_width=10,
         fig_height=13,
         save_path="docs/images/all-sites-jpd-grid.png",
@@ -606,32 +563,306 @@ sites](docs/images/all-sites-jpd-grid.png)
 
 ## Command Line Interface
 
-Installing via pip includes the `us-tidal-query` CLI for quick spatial
-lookups directly against the manifest — no Python required. The three
-modes below are run against Cook Inlet, AK.
+Installing via pip includes the `us-tidal` CLI for querying and
+downloading tidal hindcast data directly from the command line — no
+Python required.
+
+### Available options
+
+``` bash
+us-tidal --help
+```
+
+    Usage: us-tidal [OPTIONS] [LOCATION]                                           
+                                                                                    
+     Query and download modeled tidal current data from the U.S. DOE H2O High       
+     Resolution Tidal Hindcast — FVCOM simulations covering five U.S. coastal       
+     regions: Cook Inlet AK, Aleutian Islands AK, Salish Sea WA, Piscataqua River   
+     NH, and Western Passage ME.                                                    
+                                                                                    
+     A point query returns the mesh face containing the coordinate. Area and        
+     transect queries return all faces whose triangles geometrically intersect the  
+     specified geometry. Each matched face downloads as a full-year, hourly or      
+     half-hourly time series of current speed, direction, and kinetic power density 
+     at 10 depth layers (sea surface to seafloor).                                  
+                                                                                    
+     Dataset citation: https://mhkdr.openei.org/submissions/632                     
+     Documentation:                                                                 
+     https://github.com/US-Marine-Energy-Resource/us-marine-energy-resource-python  
+     AWS S3 browser:                                                                
+     https://data.openei.org/s3_viewer?bucket=marine-energy-data&prefix=us-tidal%2F 
+                                                                                    
+     Provide exactly one geometry input: a positional lat,lon for                   
+     a point query, or one of --coord, --bbox, --file,                              
+     or --wkt for area queries.                                                     
+                                                                                    
+    ╭─ Arguments ──────────────────────────────────────────────────────────────────╮
+    │   location      [LOCATION]  Point as lat,lon (e.g. 60.73,-151.43).           │
+    ╰──────────────────────────────────────────────────────────────────────────────╯
+    ╭─ Options ────────────────────────────────────────────────────────────────────╮
+    │ --coord               -c      TEXT   Transect waypoint as lat,lon. Repeat    │
+    │                                      for multi-segment lines.                │
+    │ --bbox                        TEXT   Bounding box as                         │
+    │                                      lat_min,lon_min,lat_max,lon_max.        │
+    │ --file                -f      PATH   Polygon from a GeoJSON file. Draw one   │
+    │                                      at https://geojson.io/next/.            │
+    │ --wkt                         TEXT   Polygon as a WKT POLYGON string or path │
+    │                                      to a .wkt file.                         │
+    │ --output-dir          -o      PATH   Copy downloaded parquet files to this   │
+    │                                      directory.                              │
+    │ --csv                                Export downloaded data as CSV files.    │
+    │                                      Written to --output-dir if set,         │
+    │                                      otherwise to the current directory.     │
+    │ --dry-run                            Show size estimate without downloading. │
+    │ --max-size-mb                 FLOAT  Abort if uncached data to download      │
+    │                                      exceeds this limit (MB). 0 = no limit.  │
+    │                                      [env var: US_TIDAL_MAX_SIZE_MB]         │
+    │                                      [default: 500.0]                        │
+    │ --max-distance-km             FLOAT  Reject if nearest face is farther than  │
+    │                                      this (km). Point queries only.          │
+    │ --config                      PATH   Path to config file (default:           │
+    │                                      ~/.us_tidal.toml).                      │
+    │ --aws-profile                 TEXT   Override AWS profile from config.       │
+    │ --cache-dir                   PATH   Override local cache directory from     │
+    │                                      config.                                 │
+    │ --use-hpc                            Use HPC local filesystem instead of S3. │
+    │ --hpc-base-path               TEXT   Override HPC dataset root path from     │
+    │                                      config.                                 │
+    │ --clear-cache                        Clear the local cache before running.   │
+    │ --install-completion                 Install completion for the current      │
+    │                                      shell.                                  │
+    │ --show-completion                    Show completion for the current shell,  │
+    │                                      to copy it or customize the             │
+    │                                      installation.                           │
+    │ --help                               Show this message and exit.             │
+    ╰──────────────────────────────────────────────────────────────────────────────╯
+    ╭─ Dataset Info ───────────────────────────────────────────────────────────────╮
+    │ --info                           Show dataset metadata, schema, and          │
+    │                                  statistics without downloading. Reads only  │
+    │                                  the parquet footer (fast range requests).   │
+    │ --info-speed                     Show speed category info only (implies      │
+    │                                  --info).                                    │
+    │ --info-direction                 Show direction category info only (implies  │
+    │                                  --info).                                    │
+    │ --info-power                     Show power density category info only       │
+    │                                  (implies --info).                           │
+    │ --info-depth                     Show depth/water-level category info only   │
+    │                                  (implies --info).                           │
+    │ --layer                 INTEGER  Sigma layer for --info statistics           │
+    │                                  (0=surface, 9=near-bed). Repeat to select   │
+    │                                  multiple layers.                            │
+    │ --depth                 FLOAT    Select the sigma layer nearest to this      │
+    │                                  depth (m from surface) for --info           │
+    │                                  statistics. Approximate — uses footer depth │
+    │                                  stats.                                      │
+    │ --depth-avg                      Average --info statistics across all sigma  │
+    │                                  layers.                                     │
+    ╰──────────────────────────────────────────────────────────────────────────────╯
+                                                                                    
+     Examples                                                                       
+     us-tidal 60.73,-151.43                              Point query                
+     us-tidal --coord 60.7,-151.4 --coord 60.9,-151.2   Transect                    
+     us-tidal --bbox 60.7,-151.5,60.9,-151.2            Bounding box                
+     us-tidal --file study_area.geojson                  Polygon from file          
+     us-tidal --wkt "POLYGON((-151.5 60.7,...))"         Polygon from WKT           
+     us-tidal 60.73,-151.43 --dry-run                    Size estimate              
+     us-tidal 60.73,-151.43 --info                       Dataset info (no download) 
+     us-tidal 60.73,-151.43 --info-speed                 Speed category only        
+     us-tidal 60.73,-151.43 --info --layer 3             Layer 3 stats              
+     us-tidal 60.73,-151.43 --info --depth 15.0          Layer nearest 15 m         
+     us-tidal 60.73,-151.43 --info --depth-avg           Average all layers         
+     us-tidal --bbox 60.7,-151.5,60.9,-151.2 --info      Aggregate area info        
+     us-tidal 60.73,-151.43 --output-dir ./data          Save parquet files         
+     us-tidal 60.73,-151.43 --csv                        Export CSV to current dir  
+     us-tidal 60.73,-151.43 --csv --output-dir ./data    Export CSV to ./data       
+     Config file (~/.us_tidal.toml) sets defaults for AWS, cache, and HPC options.
 
 ### Point query — nearest grid point
 
-``` {bash}
-#| output: true
-us-tidal-query --lat 60.73 --lon -151.43 --info-only
+`us-tidal` accepts a positional `lat,lon` argument. Start with
+`--dry-run` to check the size before committing to a download.
+
+``` bash
+us-tidal 60.73,-151.43 --dry-run
 ```
+
+    face_id    00126601                                                            
+     location   AK_cook_inlet                                                       
+     latitude   60.7298317                                                          
+     longitude  -151.4297485                                                        
+     distance   0.00 km (containing cell)                                           
+     file       AK_cook_inlet/v1.0.0/b1_vap_by_point_partition/lat_deg=60/lon_deg=… 
+     s3         s3://marine-energy-data/us-tidal/AK_cook_inlet/v1.0.0/b1_vap_by_po… 
+     url        https://marine-energy-data.s3.us-west-2.amazonaws.com/us-tidal/AK_… 
+      Files matched          1  
+      Total size        3.6 MB  
+      Already cached    3.6 MB  
+      To download       0.0 MB
+
+On first run the file is fetched from S3. Subsequent calls read from the
+local cache with no network traffic.
+
+``` bash
+# First run — downloads from S3
+us-tidal 60.73,-151.43
+```
+
+    face_id    00126601                                                            
+     location   AK_cook_inlet                                                       
+     latitude   60.7298317                                                          
+     longitude  -151.4297485                                                        
+     distance   0.00 km (containing cell)                                           
+     file       AK_cook_inlet/v1.0.0/b1_vap_by_point_partition/lat_deg=60/lon_deg=… 
+     s3         s3://marine-energy-data/us-tidal/AK_cook_inlet/v1.0.0/b1_vap_by_po… 
+     url        https://marine-energy-data.s3.us-west-2.amazonaws.com/us-tidal/AK_… 
+
+                 Statistics  (surface layer)             
+                                                         
+      metric                   mean       p90       max  
+     ─────────────────────────────────────────────────── 
+      Speed (m/s)             1.963     3.165      4.04  
+      Power density (W/m²)   6533.1   16244.9   33806.0  
+                                                         
+
+      ✓  1 file cached at ~/.us_tidal_cache/marine-energy-data
+
+      Elapsed: 2.0s  (S3 download)
+
+``` bash
+# Second run — served from local cache
+us-tidal 60.73,-151.43
+```
+
+    face_id    00126601                                                            
+     location   AK_cook_inlet                                                       
+     latitude   60.7298317                                                          
+     longitude  -151.4297485                                                        
+     distance   0.00 km (containing cell)                                           
+     file       AK_cook_inlet/v1.0.0/b1_vap_by_point_partition/lat_deg=60/lon_deg=… 
+     s3         s3://marine-energy-data/us-tidal/AK_cook_inlet/v1.0.0/b1_vap_by_po… 
+     url        https://marine-energy-data.s3.us-west-2.amazonaws.com/us-tidal/AK_… 
+
+                 Statistics  (surface layer)             
+                                                         
+      metric                   mean       p90       max  
+     ─────────────────────────────────────────────────── 
+      Speed (m/s)             1.963     3.165      4.04  
+      Power density (W/m²)   6533.1   16244.9   33806.0  
+                                                         
+
+      ✓  1 file cached at ~/.us_tidal_cache/marine-energy-data
+
+      Elapsed: 1.0s  (local cache)
 
 ### Area query — all grid points in a bounding box
 
-``` {bash}
-#| output: true
-us-tidal-query --mode area --lat-min 60.7 --lat-max 60.8 \
-               --lon-min -151.5 --lon-max -151.4
+`--bbox` takes `lat_min,lon_min,lat_max,lon_max`. Use `--dry-run` first
+— bbox queries can match thousands of faces.
+
+``` bash
+us-tidal --bbox 60.725,-151.445,60.735,-151.425 --dry-run
 ```
 
-### Line query — grid points along a transect
+    Matched 103 faces  ·  AK_cook_inlet
+                                                                  
+      face_id    location             lat          lon   dist_km  
+     ──────────────────────────────────────────────────────────── 
+      00127584   AK_cook_inlet   60.72406    -151.4444       0.0  
+      00126347   AK_cook_inlet   60.73291   -151.43512       0.0  
+      00127215   AK_cook_inlet   60.72453   -151.42508       0.0  
+      00127216   AK_cook_inlet   60.72458   -151.42688       0.0  
+      00127220   AK_cook_inlet   60.72469   -151.43073       0.0  
+      00127219   AK_cook_inlet   60.72481   -151.43262       0.0  
+      00127383   AK_cook_inlet   60.72487   -151.43976       0.0  
+      00127585   AK_cook_inlet    60.7249    -151.4458       0.0  
+      00127382   AK_cook_inlet   60.72509   -151.44177       0.0  
+      00127380   AK_cook_inlet   60.72521   -151.43649       0.0  
+      00127007   AK_cook_inlet   60.72524   -151.42371       0.0  
+      00127217   AK_cook_inlet   60.72542   -151.42734       0.0  
+      00127381   AK_cook_inlet   60.72544   -151.43842       0.0  
+      00127218   AK_cook_inlet   60.72548   -151.42923       0.0  
+      00127200   AK_cook_inlet    60.7257   -151.43311       0.0  
+      00127201   AK_cook_inlet   60.72588   -151.43506       0.0  
+      00127384   AK_cook_inlet    60.7259    -151.4422       0.0  
+      00127006   AK_cook_inlet    60.7261   -151.42401       0.0  
+      00127387   AK_cook_inlet   60.72612   -151.44556       0.0  
+      00127008   AK_cook_inlet   60.72623   -151.42584       0.0  
+                                                                  
+      … and 83 more
+      Files matched           103  
+      Total size        ~367.3 MB  
+      Already cached       3.6 MB  
+      To download       ~363.7 MB
 
-``` {bash}
-#| output: true
-us-tidal-query --mode line --start-lat 60.7 --start-lon -151.4 \
-               --end-lat 60.8 --end-lon -151.5 \
-               --max-distance-from-line 0.01
+``` bash
+# Download all matched faces (~367 MB)
+us-tidal --bbox 60.725,-151.445,60.735,-151.425 --output-dir ./data
+```
+
+### Transect query — grid points along a line
+
+`--coord` defines a waypoint; repeat it to build a multi-segment path.
+All faces whose triangles geometrically intersect the path are returned.
+
+``` bash
+us-tidal --coord 60.72,-151.43 --coord 60.75,-151.44 --dry-run
+```
+
+    Matched 39 faces  ·  AK_cook_inlet
+                                                                  
+      face_id    location             lat          lon   dist_km  
+     ──────────────────────────────────────────────────────────── 
+      00127818   AK_cook_inlet   60.72053   -151.43036       0.0  
+      00127621   AK_cook_inlet   60.72163   -151.43011       0.0  
+      00127622   AK_cook_inlet   60.72207   -151.43176       0.0  
+      00127423   AK_cook_inlet   60.72301   -151.43188       0.0  
+      00127422   AK_cook_inlet   60.72375   -151.43024       0.0  
+      00127220   AK_cook_inlet   60.72469   -151.43073       0.0  
+      00127219   AK_cook_inlet   60.72481   -151.43262       0.0  
+      00127200   AK_cook_inlet    60.7257   -151.43311       0.0  
+      00127012   AK_cook_inlet   60.72645   -151.43164       0.0  
+      00126992   AK_cook_inlet   60.72733   -151.43219       0.0  
+      00126807   AK_cook_inlet   60.72812   -151.43073       0.0  
+      00126788   AK_cook_inlet   60.72897   -151.43127       0.0  
+      00126787   AK_cook_inlet   60.72909   -151.43335       0.0  
+      00126764   AK_cook_inlet      60.73   -151.43396       0.0  
+      00126581   AK_cook_inlet   60.73064   -151.43268       0.0  
+      00126558   AK_cook_inlet   60.73155   -151.43317       0.0  
+      00126557   AK_cook_inlet    60.7319   -151.43494       0.0  
+      00126345   AK_cook_inlet   60.73349   -151.43335       0.0  
+      00126347   AK_cook_inlet   60.73291   -151.43512       0.0  
+      00126128   AK_cook_inlet    60.7345   -151.43329       0.0  
+                                                                  
+      … and 19 more
+      Files matched            39  
+      Total size        ~139.1 MB  
+      Already cached       0.0 MB  
+      To download       ~139.1 MB
+
+``` bash
+# Download all matched faces (~139 MB)
+us-tidal --coord 60.72,-151.43 --coord 60.75,-151.44 --output-dir ./data
+```
+
+### Export options
+
+``` bash
+# Save parquet files to a directory
+us-tidal 60.73,-151.43 --output-dir ./data
+
+# Export as CSV instead
+us-tidal 60.73,-151.43 --csv --output-dir ./data
+```
+
+### Configuration file
+
+`~/.us_tidal.toml` sets persistent defaults for AWS credentials, cache
+location, and HPC paths. CLI flags always override the config file.
+
+``` toml
+# ~/.us_tidal.toml
+aws_profile   = "my-aws-profile"
+cache_dir     = "/scratch/us_tidal_cache"
 ```
 
 ## Direct Downloads using the `tidal_hindcast` API
@@ -664,15 +895,14 @@ query = tidal._state.query   # TidalManifestQuery instance
 # Single nearest point
 point = query.query_nearest_point(lat=60.73, lon=-151.43)
 
-# All grid centroids within a bounding box (load_details=False → manifest-only,
-# no per-grid S3 requests — extremely fast)
+# All faces whose triangles intersect the bounding box
 area = query.query_all_within_rectangular_area(
-    60.7, 60.8, -151.5, -151.4, load_details=False
+    60.7, 60.8, -151.5, -151.4
 )
 
-# All grid centroids within 0.01° of a transect (load_details=False → fast)
+# All faces whose triangles are crossed by the line segment
 line = query.query_all_on_line(
-    60.7, -151.4, 60.8, -151.5, max_distance_deg=0.01, load_details=False
+    60.7, -151.4, 60.8, -151.5
 )
 
 print(
@@ -684,9 +914,9 @@ print(f"Area query    : {len(area)} grid centroids in bbox")
 print(f"Line query    : {len(line)} grid centroids along transect")
 ```
 
-    Nearest point : face 00126601  (60.7298, -151.4297)  —  0.023 km
-    Area query    : 143 grid centroids in bbox
-    Line query    : 83 grid centroids along transect
+    Nearest point : face 00126601  (60.7298, -151.4297)  —  0.000 km
+    Area query    : 3741 grid centroids in bbox
+    Line query    : 126 grid centroids along transect
 
 ``` python
 # Load a specific grid point's full-year time-series parquet.

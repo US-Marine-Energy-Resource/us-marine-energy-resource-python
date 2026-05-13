@@ -3,6 +3,7 @@
 from typing import Any
 
 import cmocean  # type: ignore[import-untyped]
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -185,7 +186,8 @@ def plot_velocity_profile_with_histograms(
         mean_vel: np.ndarray = np.nanmean(all_vel, axis=0)
 
     # --- Color palette ---
-    palette = sns.color_palette()
+    # to_hex avoids matplotlib 3.10's per-bar colour iteration over RGB tuples
+    palette = [mcolors.to_hex(c) for c in sns.color_palette()]
     bp_color = palette[0]
     bp_edge = palette[0]
     median_color = palette[1]

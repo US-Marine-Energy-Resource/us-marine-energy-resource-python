@@ -253,59 +253,16 @@ distribution — for six candidate tidal energy sites across the US.
 ### Site definitions
 
 ```{python}
-from dataclasses import dataclass
-
-
-@dataclass
-class Site:
-    """A tidal energy candidate site."""
-
-    name: str
-    lat: float
-    lon: float
-    region: str
-
-
-SITES: list[Site] = [
-    Site(
-        "Upper Cook Inlet, AK",
-        lat=60.735016,
-        lon=-151.431396,
-        region="Cook Inlet, Alaska",
-    ),
-    Site(
-        "Tacoma Narrows, WA",
-        lat=47.270191,
-        lon=-122.548172,
-        region="Puget Sound, Washington",
-    ),
-    Site(
-        "Admiralty Inlet, WA",
-        lat=48.173931,
-        lon=-122.774963,
-        region="Puget Sound, Washington",
-    ),
-    Site(
-        "UNH Living Bridge, NH",
-        lat=43.079498,
-        lon=-70.752319,
-        region="Piscataqua River, New Hampshire",
-    ),
-    Site(
-        "Moose Island, Western Passage, ME",
-        lat=44.920837,
-        lon=-66.988762,
-        region="Western Passage, Maine",
-    ),
-    Site(
-        "False Pass, Aleutian Islands, AK",
-        lat=54.803799,
-        lon=-163.364441,
-        region="Aleutian Islands, Alaska",
-    ),
+sites = [
+    {"label": "Upper Cook Inlet, AK",            "lat": 60.735016,  "lon": -151.431396},
+    {"label": "Tacoma Narrows, WA",              "lat": 47.270191,  "lon": -122.548172},
+    {"label": "Admiralty Inlet, WA",             "lat": 48.173931,  "lon": -122.774963},
+    {"label": "UNH Living Bridge, NH",           "lat": 43.079498,  "lon": -70.752319},
+    {"label": "Moose Island, Western Passage, ME", "lat": 44.920837, "lon": -66.988762},
+    {"label": "False Pass, Aleutian Islands, AK", "lat": 54.803799,  "lon": -163.364441},
 ]
 
-PRIMARY = SITES[0]
+cook_inlet = sites[0]
 ```
 
 ### Load data for all sites
@@ -317,12 +274,12 @@ depth bounds at all 10 vertical levels.
 
 ```{python}
 #| output: true
-site_data: dict[str, pd.DataFrame] = {}
+site_data = {}
 
-for site in SITES:
-    print(f"Loading {site.name} …")
-    site_data[site.name] = tidal.get_data_at_point(site.lat, site.lon)
-    site_df = site_data[site.name]
+for site in sites:
+    print(f"Loading {site['label']} …")
+    site_data[site["label"]] = tidal.get_data_at_point(site["lat"], site["lon"])
+    site_df = site_data[site["label"]]
     date_range = f"{site_df.index[0].date()} → {site_df.index[-1].date()}"
     print(f"  {len(site_df):,} timesteps  ({date_range})\n")
 ```
@@ -344,13 +301,13 @@ asymmetry between flood and ebb, and the vertical shear between the fast surface
 and slower near-bed layers are all directly visible.
 
 ```{python}
-df_primary = site_data[PRIMARY.name]
-lat, lon = PRIMARY.lat, PRIMARY.lon
+df_primary = site_data[cook_inlet["label"]]
+lat, lon = cook_inlet["lat"], cook_inlet["lon"]
 
 tidal.plot_sigma_layers_speed(
     df_primary,
     settings=PlotSettings(
-        title=f"Current Speed Across Sigma Layers — {PRIMARY.name}",
+        title=f"Current Speed Across Sigma Layers — {cook_inlet['label']}",
         fig_height=3,
         fig_width=8,
         caption=f"Latitude: {lat}, Longitude: {lon}",
@@ -371,7 +328,7 @@ the key inputs for turbine capacity-factor estimates.
 _, exc_stats = tidal.plot_velocity_exceedance(
     df_primary,
     settings=PlotSettings(
-        title=f"Velocity Exceedance — {PRIMARY.name}",
+        title=f"Velocity Exceedance — {cook_inlet['label']}",
         fig_width=10,
         fig_height=5,
         caption=f"Latitude: {lat}, Longitude: {lon}",
@@ -403,7 +360,7 @@ tidal.generate_tidal_joint_probability(
     df_primary,
     sigma_layer=4,
     settings=PlotSettings(
-        title=f"Joint Probability Distribution — {PRIMARY.name}",
+        title=f"Joint Probability Distribution — {cook_inlet['label']}",
         fig_width=8,
         fig_height=8,
         caption=f"Latitude: {lat}, Longitude: {lon}",
@@ -419,9 +376,8 @@ tidal.generate_tidal_joint_probability(
 ## All-sites comparison
 
 The following three visualizations compare the same plot type across all six
-candidate sites.  A single `ANALYSIS_DEPTH` variable controls the nominal
-depth used for layer selection, keeping the exceedance and JPD panels on an
-apples-to-apples basis.
+candidate sites.  A single `analysis_depth` variable controls the nominal depth used for layer
+selection, keeping the exceedance and JPD panels on an apples-to-apples basis.
 
 ### Setup — depth and layer selection
 
@@ -429,20 +385,20 @@ apples-to-apples basis.
 #| output: true
 import math
 
-ANALYSIS_DEPTH = 10.0  # m — nominal analysis depth
-ANALYSIS_DEPTH_RELATIVE_TO = "surface"  # "surface" or "sea_floor"
+analysis_depth = 10.0  # m — nominal analysis depth
+depth_reference = "surface"  # "surface" or "sea_floor"
 
-# Select the sigma layer closest to ANALYSIS_DEPTH for each site.
-site_layers: dict[str, tuple[int, float]] = {}
-for site in SITES:
+# Select the sigma layer closest to analysis_depth for each site.
+site_layers = {}
+for site in sites:
     layer, actual_depth = tidal.select_layer_for_depth(
-        site_data[site.name],
-        ANALYSIS_DEPTH,
-        relative_to=ANALYSIS_DEPTH_RELATIVE_TO,
+        site_data[site["label"]],
+        analysis_depth,
+        relative_to=depth_reference,
     )
-    site_layers[site.name] = (layer, actual_depth)
+    site_layers[site["label"]] = (layer, actual_depth)
     print(
-        f"{site.name:<40} layer {layer}  "
+        f"{site['label']:<40} layer {layer}  "
         f"(mean depth {actual_depth:.1f} m)"
     )
 ```
@@ -457,22 +413,22 @@ to the nearest 0.5 m/s.
 # Compute shared "nice max" colorbar limit.
 all_max_speeds = [
     float(
-        site_data[site.name][
+        site_data[site["label"]][
             [f"vap_sea_water_speed_layer_{i}" for i in range(10)]
         ].max().max()
     )
-    for site in SITES
+    for site in sites
 ]
 speed_vmax = math.ceil(max(all_max_speeds) / 0.5) * 0.5
 
-for site in SITES:
-    slug = site.name.lower().replace(", ", "-").replace(" ", "-").replace(".", "")
-    site_df = site_data[site.name]
+for site in sites:
+    slug = site["label"].lower().replace(", ", "-").replace(" ", "-").replace(".", "")
+    site_df = site_data[site["label"]]
     tidal.plot_sigma_layers_speed(
         site_df,
         settings=PlotSettings(
-            title=f"Current Speed Across Sigma Layers — {site.name}",
-            caption=f"Lat: {site.lat}, Lon: {site.lon}",
+            title=f"Current Speed Across Sigma Layers — {site['label']}",
+            caption=f"Lat: {site['lat']}, Lon: {site['lon']}",
             colorbar_max=speed_vmax,
             fig_width=9,
             fig_height=2.5,
@@ -493,16 +449,16 @@ for site in SITES:
 All six sites on one figure at their respective analysis-depth layers.
 
 ```{python}
-TAB10 = plt.cm.tab10.colors  # type: ignore[attr-defined]
+colors = plt.cm.tab10.colors
 site_records_exc = [
-    (site.name, site_data[site.name], site_layers[site.name][0], TAB10[i])
-    for i, site in enumerate(SITES)
+    (site["label"], site_data[site["label"]], site_layers[site["label"]][0], colors[i])
+    for i, site in enumerate(sites)
 ]
 
 tidal.plot_multi_site_exceedance_overlay(
     site_records_exc,
     settings=PlotSettings(
-        title=f"Velocity Exceedance — All Sites  (analysis depth ≈ {ANALYSIS_DEPTH} m {ANALYSIS_DEPTH_RELATIVE_TO})",
+        title=f"Velocity Exceedance — All Sites  (analysis depth ≈ {analysis_depth} m {depth_reference})",
         fig_height=3,
         fig_width=8,
         save_path="docs/images/all-sites-exceedance-overlay.png",
@@ -518,15 +474,15 @@ tidal.plot_multi_site_exceedance_overlay(
 
 ```{python}
 site_records_jpd = [
-    (site.name, site_data[site.name], site_layers[site.name][0])
-    for site in SITES
+    (site["label"], site_data[site["label"]], site_layers[site["label"]][0])
+    for site in sites
 ]
 
 tidal.plot_jpd_comparison_grid(
     site_records_jpd,
     ncols=2,
     settings=PlotSettings(
-        title=f"Joint Probability Distribution — All Sites  (analysis depth ≈ {ANALYSIS_DEPTH} m {ANALYSIS_DEPTH_RELATIVE_TO})",
+        title=f"Joint Probability Distribution — All Sites  (analysis depth ≈ {analysis_depth} m {depth_reference})",
         fig_width=10,
         fig_height=13,
         save_path="docs/images/all-sites-jpd-grid.png",
@@ -538,31 +494,152 @@ tidal.plot_jpd_comparison_grid(
 
 ## Command Line Interface
 
-Installing via pip includes the `us-tidal-query` CLI for quick spatial lookups directly against the
-manifest — no Python required. The three modes below are run against Cook Inlet, AK.
+Installing via pip includes the `us-tidal` CLI for querying and downloading tidal hindcast data
+directly from the command line — no Python required.
+
+### Available options
+
+```bash
+us-tidal --help
+```
+
+```{python}
+#| echo: false
+#| output: true
+import os, re, shutil, subprocess, time
+
+_env = {**os.environ, "NO_COLOR": "1"}
+_demo_cache = "/tmp/us_tidal_readme_demo"
+_SPINNER = set("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
+
+def _run(*args: str) -> str:
+    r = subprocess.run(list(args), capture_output=True, text=True, env=_env)
+    return _clean(r.stdout)
+
+def _clean(text: str) -> str:
+    # Strip OSC 8 hyperlink opening tags (keep display text that follows)
+    # Format: ESC ] 8 ; params ; url ST  where ST is ESC \ or BEL
+    text = re.sub(r"\x1b\]8;[^;]*;[^\x1b\x07]*(?:\x1b\\|\x07)", "", text)
+    # Strip OSC 8 hyperlink closing tags
+    text = re.sub(r"\x1b\]8;;(?:\x1b\\|\x07)", "", text)
+    # Strip any remaining SGR / CSI escape sequences
+    text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", text)
+    # Drop spinner / live-status lines
+    lines = [l for l in text.splitlines() if not any(c in l for c in _SPINNER)]
+    # Replace demo cache path with the real default
+    return "\n".join(lines).replace(_demo_cache, "~/.us_tidal_cache").strip()
+
+print(_run("us-tidal", "--help"))
+```
 
 ### Point query — nearest grid point
 
-```{bash}
+`us-tidal` accepts a positional `lat,lon` argument. Start with `--dry-run` to check the size
+before committing to a download.
+
+```bash
+us-tidal 60.73,-151.43 --dry-run
+```
+
+```{python}
+#| echo: false
 #| output: true
-us-tidal-query --lat 60.73 --lon -151.43 --info-only
+print(_run("us-tidal", "60.73,-151.43", "--dry-run"))
+```
+
+On first run the file is fetched from S3. Subsequent calls read from the local cache with no
+network traffic.
+
+```bash
+# First run — downloads from S3
+us-tidal 60.73,-151.43
+```
+
+```{python}
+#| echo: false
+#| output: true
+shutil.rmtree(_demo_cache, ignore_errors=True)
+t0 = time.perf_counter()
+out = _run("us-tidal", "60.73,-151.43", "--cache-dir", _demo_cache)
+elapsed = time.perf_counter() - t0
+print(out)
+print(f"\n  Elapsed: {elapsed:.1f}s  (S3 download)")
+```
+
+```bash
+# Second run — served from local cache
+us-tidal 60.73,-151.43
+```
+
+```{python}
+#| echo: false
+#| output: true
+t0 = time.perf_counter()
+out = _run("us-tidal", "60.73,-151.43", "--cache-dir", _demo_cache)
+elapsed = time.perf_counter() - t0
+print(out)
+print(f"\n  Elapsed: {elapsed:.1f}s  (local cache)")
 ```
 
 ### Area query — all grid points in a bounding box
 
-```{bash}
-#| output: true
-us-tidal-query --mode area --lat-min 60.7 --lat-max 60.8 \
-               --lon-min -151.5 --lon-max -151.4
+`--bbox` takes `lat_min,lon_min,lat_max,lon_max`. Use `--dry-run` first — bbox queries can match
+thousands of faces.
+
+```bash
+us-tidal --bbox 60.725,-151.445,60.735,-151.425 --dry-run
 ```
 
-### Line query — grid points along a transect
-
-```{bash}
+```{python}
+#| echo: false
 #| output: true
-us-tidal-query --mode line --start-lat 60.7 --start-lon -151.4 \
-               --end-lat 60.8 --end-lon -151.5 \
-               --max-distance-from-line 0.01
+print(_run("us-tidal", "--bbox", "60.725,-151.445,60.735,-151.425", "--dry-run"))
+```
+
+```bash
+# Download all matched faces (~367 MB)
+us-tidal --bbox 60.725,-151.445,60.735,-151.425 --output-dir ./data
+```
+
+### Transect query — grid points along a line
+
+`--coord` defines a waypoint; repeat it to build a multi-segment path. All faces whose triangles
+geometrically intersect the path are returned.
+
+```bash
+us-tidal --coord 60.72,-151.43 --coord 60.75,-151.44 --dry-run
+```
+
+```{python}
+#| echo: false
+#| output: true
+print(_run("us-tidal", "--coord", "60.72,-151.43", "--coord", "60.75,-151.44", "--dry-run"))
+```
+
+```bash
+# Download all matched faces (~139 MB)
+us-tidal --coord 60.72,-151.43 --coord 60.75,-151.44 --output-dir ./data
+```
+
+### Export options
+
+```bash
+# Save parquet files to a directory
+us-tidal 60.73,-151.43 --output-dir ./data
+
+# Export as CSV instead
+us-tidal 60.73,-151.43 --csv --output-dir ./data
+```
+
+### Configuration file
+
+`~/.us_tidal.toml` sets persistent defaults for AWS credentials, cache location, and HPC paths.
+CLI flags always override the config file.
+
+```toml
+# ~/.us_tidal.toml
+aws_profile   = "my-aws-profile"
+cache_dir     = "/scratch/us_tidal_cache"
 ```
 
 
@@ -594,15 +671,14 @@ query = tidal._state.query   # TidalManifestQuery instance
 # Single nearest point
 point = query.query_nearest_point(lat=60.73, lon=-151.43)
 
-# All grid centroids within a bounding box (load_details=False → manifest-only,
-# no per-grid S3 requests — extremely fast)
+# All faces whose triangles intersect the bounding box
 area = query.query_all_within_rectangular_area(
-    60.7, 60.8, -151.5, -151.4, load_details=False
+    60.7, 60.8, -151.5, -151.4
 )
 
-# All grid centroids within 0.01° of a transect (load_details=False → fast)
+# All faces whose triangles are crossed by the line segment
 line = query.query_all_on_line(
-    60.7, -151.4, 60.8, -151.5, max_distance_deg=0.01, load_details=False
+    60.7, -151.4, 60.8, -151.5
 )
 
 print(

@@ -12,11 +12,20 @@ Features:
 - S3 cache integration for on-demand data file loading
 """
 
+from __future__ import annotations
+
+import contextlib
 import json
+import re
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .cache import S3CacheManager
 
 from ._spatial import (
+    _COORD_DECIMAL_PRECISION,
+    _COORD_PRECISION_SCALE,
     AreaOutsideDomainError,
     OutsideDomainError,
     PointOutsideDomainError,
@@ -25,6 +34,112 @@ from ._spatial import (
     find_faces_line,
     find_faces_point,
 )
+
+# ---------------------------------------------------------------------------
+# Manifest discovery utilities
+# ---------------------------------------------------------------------------
+
+
+def parse_semver(version_str: str) -> tuple[int, int, int]:
+    """Parse a semantic version string into a comparable integer tuple."""
+    m = re.match(r"(\d+)\.(\d+)\.(\d+)", version_str)
+    if not m:
+        raise ValueError(f"Invalid semver: {version_str!r}")
+    return int(m.group(1)), int(m.group(2)), int(m.group(3))
+
+
+def find_latest_manifest_hpc(base_path: str) -> Path | None:
+    """Find the latest manifest file on the HPC filesystem.
+
+    Parameters
+    ----------
+    base_path : str
+        HPC dataset root (e.g. ``/projects/hindcastra/Tidal/datasets/…``).
+
+    Returns
+    -------
+    Path or None
+        Path to the newest ``manifest_*.json`` found, or ``None`` if not found.
+    """
+    manifests_dir = Path(base_path) / "manifest"
+    if not manifests_dir.exists():
+        return None
+
+    version_dirs: list[tuple[Path, tuple[int, int, int]]] = []
+    for d in manifests_dir.iterdir():
+        if d.is_dir() and d.name.startswith("v"):
+            with contextlib.suppress(ValueError):
+                version_dirs.append((d, parse_semver(d.name[1:])))
+
+    version_dirs.sort(key=lambda x: x[1], reverse=True)
+    for version_dir, _ in version_dirs:
+        manifest_files: list[tuple[Path, tuple[int, int, int]]] = []
+        for f in version_dir.glob("manifest_*.json"):
+            m = re.search(r"manifest_(\d+\.\d+\.\d+)\.json", f.name)
+            if m:
+                with contextlib.suppress(ValueError):
+                    manifest_files.append((f, parse_semver(m.group(1))))
+        manifest_files.sort(key=lambda x: x[1], reverse=True)
+        if manifest_files:
+            return manifest_files[0][0]
+    return None
+
+
+def find_latest_manifest_s3(
+    s3_cache: S3CacheManager,
+) -> tuple[Path, str] | None:
+    """Find the latest manifest, checking the local cache before hitting S3.
+
+    Parameters
+    ----------
+    s3_cache : S3CacheManager
+        Configured cache manager pointing at the tidal dataset bucket.
+
+    Returns
+    -------
+    tuple of (Path, str) or None
+        ``(local path to cached manifest, version string)`` when found.
+        Returns ``None`` when no manifest versions exist under the S3 prefix.
+    """
+    manifest_cache_dir = s3_cache.cache_dir / "manifest"
+    if manifest_cache_dir.exists():
+        version_dirs: list[tuple[Path, tuple[int, int, int]]] = []
+        for d in manifest_cache_dir.iterdir():
+            if d.is_dir() and d.name.startswith("v"):
+                with contextlib.suppress(ValueError):
+                    version_dirs.append((d, parse_semver(d.name[1:])))
+        if version_dirs:
+            version_dirs.sort(key=lambda x: x[1], reverse=True)
+            latest_dir, latest_version_tuple = version_dirs[0]
+            latest_version = ".".join(map(str, latest_version_tuple))
+            manifest_file = latest_dir / f"manifest_{latest_version}.json"
+            if manifest_file.exists():
+                return manifest_file, latest_version
+
+    manifest_prefix = f"{s3_cache.prefix}/manifest/"
+    response = s3_cache.s3.list_objects_v2(
+        Bucket=s3_cache.bucket,
+        Prefix=manifest_prefix,
+        Delimiter="/",
+    )
+
+    s3_version_dirs: list[tuple[str, tuple[int, int, int]]] = []
+    for prefix_info in response.get("CommonPrefixes", []):
+        dir_name = prefix_info["Prefix"].rstrip("/").split("/")[-1]
+        if dir_name.startswith("v"):
+            with contextlib.suppress(ValueError):
+                s3_version_dirs.append((dir_name, parse_semver(dir_name[1:])))
+
+    if not s3_version_dirs:
+        return None
+
+    s3_version_dirs.sort(key=lambda x: x[1], reverse=True)
+    latest_dir_name = s3_version_dirs[0][0]
+    latest_version = ".".join(map(str, s3_version_dirs[0][1]))
+    manifest_key = f"{manifest_prefix}{latest_dir_name}/manifest_{latest_version}.json"
+    relative_path = manifest_key[len(s3_cache.prefix) + 1:]
+    local_path = s3_cache.get(relative_path)
+    return local_path, latest_version
 
 
 class TidalManifestQuery:
@@ -125,6 +240,12 @@ class TidalManifestQuery:
         lat_str, lon_str, face_id_str = point
         lat = float(lat_str)
         lon = float(lon_str)
+
+        # Re-format to the canonical precision used in S3 filenames.
+        # str(float) silently drops trailing zeros (e.g. -122.5481720 → '-122.548172'),
+        # which produces a path that doesn't match the actual S3 object key.
+        lat_str = f"{lat:.{_COORD_DECIMAL_PRECISION}f}"
+        lon_str = f"{lon:.{_COORD_DECIMAL_PRECISION}f}"
 
         multiplier = 10**self.decimal_places
         lat_deg = int(lat)
@@ -266,8 +387,8 @@ class TidalManifestQuery:
 
         row = df.iloc[0]
         face_id = str(row["face_id"])
-        lat_val = float(row["lat_fixed_precision"]) / (10 ** self.decimal_places)
-        lon_val = float(row["lon_fixed_precision"]) / (10 ** self.decimal_places)
+        lat_val = float(row["lat_fixed_precision"]) / _COORD_PRECISION_SCALE
+        lon_val = float(row["lon_fixed_precision"]) / _COORD_PRECISION_SCALE
         location = str(row["location"])
         distance_km = float(row["distance_km"])
 
@@ -312,30 +433,12 @@ class TidalManifestQuery:
             ``distance_km``, ``n_points`` (always 1).
             Returns ``[]`` when the bbox does not intersect any dataset domain.
         """
-        coords = [
+        return self.query_all_within_polygon([
             (lat_min, lon_min),
             (lat_min, lon_max),
             (lat_max, lon_max),
             (lat_max, lon_min),
-        ]
-        try:
-            df = find_faces_area(coords)
-        except AreaOutsideDomainError:
-            return []
-
-        results: list[dict[str, Any]] = []
-        for _, row in df.iterrows():
-            results.append({
-                "face_id": str(row["face_id"]),
-                "centroid": (
-                    float(row["lat_fixed_precision"]) / (10 ** self.decimal_places),
-                    float(row["lon_fixed_precision"]) / (10 ** self.decimal_places),
-                ),
-                "location": str(row["location"]),
-                "distance_km": float(row["distance_km"]),
-                "n_points": 1,
-            })
-        return results
+        ])
 
     def query_all_on_line(
         self,
@@ -367,7 +470,26 @@ class TidalManifestQuery:
             (always 1).  Sorted by ``frac_along``.
             Returns ``[]`` when the line does not intersect any dataset domain.
         """
-        coords = [(start_lat, start_lon), (end_lat, end_lon)]
+        return self.query_all_on_path([(start_lat, start_lon), (end_lat, end_lon)])
+
+    def query_all_on_path(
+        self,
+        coords: list[tuple[float, float]],
+    ) -> list[dict[str, Any]]:
+        """Find all mesh faces intersected by a multi-vertex polyline.
+
+        Parameters
+        ----------
+        coords : list of (lat, lon) tuples
+            Polyline vertices in order (at least 2 points).
+
+        Returns
+        -------
+        list of dict
+            Each entry has: ``face_id``, ``centroid`` (lat, lon), ``location``,
+            ``frac_along``, ``n_points`` (always 1).  Sorted by ``frac_along``.
+            Returns ``[]`` when the line does not intersect any dataset domain.
+        """
         try:
             df = find_faces_line(coords)
         except (TransectOutsideDomainError, OutsideDomainError):
@@ -378,13 +500,71 @@ class TidalManifestQuery:
             results.append({
                 "face_id": str(row["face_id"]),
                 "centroid": (
-                    float(row["lat_fixed_precision"]) / (10 ** self.decimal_places),
-                    float(row["lon_fixed_precision"]) / (10 ** self.decimal_places),
+                    float(row["lat_fixed_precision"]) / _COORD_PRECISION_SCALE,
+                    float(row["lon_fixed_precision"]) / _COORD_PRECISION_SCALE,
                 ),
                 "location": str(row["location"]),
                 "frac_along": float(row["frac_along"]),
                 "n_points": 1,
             })
-
         return results
+
+    def query_all_within_polygon(
+        self,
+        coords: list[tuple[float, float]],
+    ) -> list[dict[str, Any]]:
+        """Find all mesh faces that intersect an arbitrary polygon.
+
+        Parameters
+        ----------
+        coords : list of (lat, lon) tuples
+            Ring coordinates defining the polygon.  At least 3 points required.
+            Need not be closed (closing vertex is added automatically).
+
+        Returns
+        -------
+        list of dict
+            Each entry has: ``face_id``, ``centroid`` (lat, lon), ``location``,
+            ``distance_km``, ``n_points`` (always 1).
+            Returns ``[]`` when the polygon does not intersect any dataset domain.
+        """
+        try:
+            df = find_faces_area(coords)
+        except AreaOutsideDomainError:
+            return []
+
+        results: list[dict[str, Any]] = []
+        for _, row in df.iterrows():
+            results.append({
+                "face_id": str(row["face_id"]),
+                "centroid": (
+                    float(row["lat_fixed_precision"]) / _COORD_PRECISION_SCALE,
+                    float(row["lon_fixed_precision"]) / _COORD_PRECISION_SCALE,
+                ),
+                "location": str(row["location"]),
+                "distance_km": float(row["distance_km"]),
+                "n_points": 1,
+            })
+        return results
+
+    def get_file_path(self, face_result: dict[str, Any]) -> str:
+        """Get the parquet file path for a multi-face query result dict.
+
+        Parameters
+        ----------
+        face_result : dict
+            A result dict from :meth:`query_all_on_path`, :meth:`query_all_on_line`,
+            :meth:`query_all_within_rectangular_area`, or
+            :meth:`query_all_within_polygon`.
+
+        Returns
+        -------
+        str
+            Relative parquet file path (prefix-relative to S3 base URI).
+        """
+        lat, lon = face_result["centroid"]
+        return self.reconstruct_path(
+            [str(lat), str(lon), face_result["face_id"]],
+            face_result["location"],
+        )
 
