@@ -1,0 +1,28 @@
+name: Render README
+
+on:
+  push:
+    branches: ["main", "develop", "feat_improve_tests"]
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Install package with examples dependencies
+        run: uv pip install -e ".[dev,examples]"
+
+      - name: Set up Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Render README
+        run: quarto render README.qmd --to gfm
