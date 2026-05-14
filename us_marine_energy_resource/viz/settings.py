@@ -2,13 +2,173 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+import numpy as np
 import pandas as pd
 
+from us_marine_energy_resource.analysis.preprocessing import (
+    DepthMode,
+    sigma_depth_axis_label,
+    sigma_layer_depth_col,
+)
+
 OutputFormat = Literal["svg", "png", "pdf", "eps"]
+
+
+@dataclass
+class DepthPerspective:
+    """Depth coordinate convention and display sign for sigma-layer visualizations.
+
+    Controls which reference frame is used for the depth axis and whether larger
+    values represent shallower or deeper positions.
+
+    Parameters
+    ----------
+    mode : DepthMode
+        Reference frame. Determines which DataFrame columns are read and the
+        natural axis direction. Defaults to :attr:`DepthMode.FixedBottom`.
+    positive_up : bool, optional
+        When ``True`` larger values represent shallower positions (y-axis
+        increases upward). When ``False`` larger values represent deeper
+        positions (y-axis increases downward). ``None`` (default) infers from
+        *mode*: ``FixedBottom`` and ``Navd88Elevation`` default to ``True``;
+        ``FixedSurface`` and ``Navd88Depth`` default to ``False``.
+
+    Examples
+    --------
+    Fixed-bottom elevation (default global):
+
+    >>> DepthPerspective()
+
+    Oceanographic convention (depth from surface):
+
+    >>> DepthPerspective(mode=DepthMode.FixedSurface)
+
+    Negative depth (0 at surface, −30 m at seafloor):
+
+    >>> DepthPerspective(mode=DepthMode.FixedSurface, positive_up=True)
+
+    NAVD88 elevation:
+
+    >>> DepthPerspective(mode=DepthMode.Navd88Elevation)
+    """
+
+    mode: DepthMode = field(default=DepthMode.FixedBottom)
+    positive_up: bool | None = field(default=None)
+    depth_label_override: str | None = field(default=None)
+
+    def effective_positive_up(self) -> bool:
+        """Resolve ``positive_up``, inferring from *mode* when ``None``."""
+        if self.positive_up is not None:
+            return self.positive_up
+        return self.mode in (DepthMode.FixedBottom, DepthMode.Navd88Elevation)
+
+    def display_array(self, values: np.ndarray) -> np.ndarray:
+        """Apply sign convention to depth values before plotting.
+
+        Negates *values* when the mode's natural direction disagrees with
+        the requested :attr:`positive_up` setting.
+        """
+        is_upward_mode = self.mode in (DepthMode.FixedBottom, DepthMode.Navd88Elevation)
+        if is_upward_mode != self.effective_positive_up():
+            return -values
+        return values
+
+    def should_invert_axis(self) -> bool:
+        """Whether to call ``ax.invert_yaxis()`` after plotting."""
+        return not self.effective_positive_up()
+
+    def depth_col(self, layer: int) -> str:
+        """Return the DataFrame column name for sigma *layer* in this mode."""
+        return sigma_layer_depth_col(layer, self.mode)
+
+    def depth_label(self) -> str:
+        """Return the depth axis label for this perspective.
+
+        Returns :attr:`depth_label_override` when set, otherwise
+        auto-generates from *mode* (e.g. ``"Height Above Seafloor [m]"``
+        for :attr:`DepthMode.FixedBottom`). May be applied to either the
+        x or y axis depending on the plot type.
+        """
+        if self.depth_label_override is not None:
+            return self.depth_label_override
+        return sigma_depth_axis_label(self.mode)
+
+
+_DEFAULT_DEPTH_PERSPECTIVE: DepthPerspective = DepthPerspective()
+
+
+def set_depth_perspective(perspective: DepthPerspective) -> None:
+    """Set the module-level default :class:`DepthPerspective` for all plot functions.
+
+    All subsequent plot calls that do not supply an explicit
+    ``depth_perspective`` in their :class:`PlotSettings` will use this
+    perspective.
+
+    Parameters
+    ----------
+    perspective : DepthPerspective
+        New default depth perspective.
+
+    See Also
+    --------
+    depth_perspective_context : Scoped, reversible alternative.
+    get_depth_perspective : Resolves the effective perspective for a call.
+    """
+    global _DEFAULT_DEPTH_PERSPECTIVE
+    _DEFAULT_DEPTH_PERSPECTIVE = perspective
+
+
+def get_depth_perspective(settings: PlotSettings | None = None) -> DepthPerspective:
+    """Resolve the effective :class:`DepthPerspective` for a plot call.
+
+    Priority: ``settings.depth_perspective`` > module-level default.
+
+    Parameters
+    ----------
+    settings : PlotSettings, optional
+        Per-call settings.  When ``None`` or when
+        ``settings.depth_perspective`` is ``None``, returns the global
+        default set by :func:`set_depth_perspective`.
+
+    Returns
+    -------
+    DepthPerspective
+    """
+    if settings is not None and settings.depth_perspective is not None:
+        return settings.depth_perspective
+    return _DEFAULT_DEPTH_PERSPECTIVE
+
+
+@contextmanager
+def depth_perspective_context(perspective: DepthPerspective) -> Iterator[None]:
+    """Context manager for a scoped :class:`DepthPerspective` override.
+
+    Temporarily replaces the module-level default for the duration of the
+    ``with`` block, then restores the previous value on exit.
+
+    Parameters
+    ----------
+    perspective : DepthPerspective
+        Perspective to apply within the context.
+
+    Examples
+    --------
+    >>> with depth_perspective_context(DepthPerspective(DepthMode.FixedSurface)):
+    ...     tidal.plot_velocity_profile_with_histograms(df, settings=s)
+    """
+    global _DEFAULT_DEPTH_PERSPECTIVE
+    previous = _DEFAULT_DEPTH_PERSPECTIVE
+    _DEFAULT_DEPTH_PERSPECTIVE = perspective
+    try:
+        yield
+    finally:
+        _DEFAULT_DEPTH_PERSPECTIVE = previous
 
 
 @dataclass
@@ -89,6 +249,12 @@ class PlotSettings:
         styling is applied.  The file format is inferred from the extension
         (e.g. ``".png"``, ``".svg"``).  Parent directories are created
         automatically.  When ``None`` (default) no file is written.
+    depth_perspective : DepthPerspective, optional
+        Override the depth coordinate convention for this call only.  When
+        ``None`` (default) the module-level default set by
+        :func:`set_depth_perspective` is used (initially
+        :attr:`DepthMode.FixedBottom`).  Affects which depth columns are
+        read, the axis direction, and the depth axis label.
 
     Examples
     --------
@@ -121,3 +287,4 @@ class PlotSettings:
     datetime_style: Literal["auto", "concise", "short", "long"] | None = field(default=None)
     output_format: OutputFormat = field(default="svg")
     save_path: str | Path | None = field(default=None)
+    depth_perspective: DepthPerspective | None = field(default=None)
