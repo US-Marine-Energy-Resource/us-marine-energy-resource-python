@@ -10,7 +10,7 @@ import seaborn as sns
 from matplotlib.figure import Figure
 
 from us_marine_energy_resource.viz._style import styled
-from us_marine_energy_resource.viz.settings import PlotSettings
+from us_marine_energy_resource.viz.settings import PlotSettings, get_depth_perspective
 
 from ._components import _validate_columns
 
@@ -56,13 +56,15 @@ def plot_tidal_time_series(
     if layers is None:
         layers = [0, 4, 9]
 
+    perspective = get_depth_perspective(settings)
+
     required = []
     for layer in layers:
         required += [
             f"vap_sea_water_speed_layer_{layer}",
             f"vap_sea_water_to_direction_layer_{layer}",
             f"vap_sea_water_power_density_layer_{layer}",
-            f"vap_sigma_depth_layer_{layer}",
+            perspective.depth_col(layer),
         ]
     _validate_columns(df, required)
 
@@ -72,7 +74,7 @@ def plot_tidal_time_series(
 
     # Panel 1 — current speed
     for i, layer in enumerate(layers):
-        depth = float(df[f"vap_sigma_depth_layer_{layer}"].iloc[0])
+        depth = float(df[perspective.depth_col(layer)].iloc[0])
         axs[0].plot(
             df.index,
             df[f"vap_sea_water_speed_layer_{layer}"],
@@ -162,6 +164,8 @@ def plot_tidal_asymmetry(
 
     from ._components import _validate_columns
 
+    perspective = get_depth_perspective(settings)
+
     _validate_columns(
         df,
         [
@@ -169,13 +173,13 @@ def plot_tidal_asymmetry(
             f"vap_sea_water_to_direction_layer_{layer}",
             f"u_layer_{layer}",
             f"v_layer_{layer}",
-            f"vap_sigma_depth_layer_{layer}",
+            perspective.depth_col(layer),
         ],
     )
 
     speeds: np.ndarray = df[f"vap_sea_water_speed_layer_{layer}"].to_numpy(dtype=float)
     directions: np.ndarray = df[f"vap_sea_water_to_direction_layer_{layer}"].to_numpy(dtype=float)
-    depth_value = float(df[f"vap_sigma_depth_layer_{layer}"].mean())
+    depth_value = float(df[perspective.depth_col(layer)].mean())
 
     u_dir = -speeds * np.sin(np.radians(directions))
     v_dir = -speeds * np.cos(np.radians(directions))
