@@ -103,7 +103,13 @@ class DepthPerspective:
 _DEFAULT_DEPTH_PERSPECTIVE: DepthPerspective = DepthPerspective()
 
 
-def set_depth_perspective(perspective: DepthPerspective) -> None:
+def _as_depth_perspective(v: DepthPerspective | DepthMode) -> DepthPerspective:
+    if isinstance(v, DepthMode):
+        return DepthPerspective(mode=v)
+    return v
+
+
+def set_depth_perspective(perspective: DepthPerspective | DepthMode) -> None:
     """Set the module-level default :class:`DepthPerspective` for all plot functions.
 
     All subsequent plot calls that do not supply an explicit
@@ -112,8 +118,10 @@ def set_depth_perspective(perspective: DepthPerspective) -> None:
 
     Parameters
     ----------
-    perspective : DepthPerspective
-        New default depth perspective.
+    perspective : DepthPerspective | DepthMode
+        New default depth perspective.  A bare :class:`DepthMode` is
+        automatically wrapped in a :class:`DepthPerspective` with default
+        display options.
 
     See Also
     --------
@@ -121,7 +129,7 @@ def set_depth_perspective(perspective: DepthPerspective) -> None:
     get_depth_perspective : Resolves the effective perspective for a call.
     """
     global _DEFAULT_DEPTH_PERSPECTIVE
-    _DEFAULT_DEPTH_PERSPECTIVE = perspective
+    _DEFAULT_DEPTH_PERSPECTIVE = _as_depth_perspective(perspective)
 
 
 def get_depth_perspective(settings: PlotSettings | None = None) -> DepthPerspective:
@@ -141,12 +149,12 @@ def get_depth_perspective(settings: PlotSettings | None = None) -> DepthPerspect
     DepthPerspective
     """
     if settings is not None and settings.depth_perspective is not None:
-        return settings.depth_perspective
+        return _as_depth_perspective(settings.depth_perspective)
     return _DEFAULT_DEPTH_PERSPECTIVE
 
 
 @contextmanager
-def depth_perspective_context(perspective: DepthPerspective) -> Iterator[None]:
+def depth_perspective_context(perspective: DepthPerspective | DepthMode) -> Iterator[None]:
     """Context manager for a scoped :class:`DepthPerspective` override.
 
     Temporarily replaces the module-level default for the duration of the
@@ -154,17 +162,19 @@ def depth_perspective_context(perspective: DepthPerspective) -> Iterator[None]:
 
     Parameters
     ----------
-    perspective : DepthPerspective
-        Perspective to apply within the context.
+    perspective : DepthPerspective | DepthMode
+        Perspective to apply within the context.  A bare :class:`DepthMode`
+        is automatically wrapped in a :class:`DepthPerspective` with default
+        display options.
 
     Examples
     --------
-    >>> with depth_perspective_context(DepthPerspective(DepthMode.FixedSurface)):
+    >>> with depth_perspective_context(DepthMode.FixedSurface):
     ...     tidal.plot_velocity_profile_with_histograms(df, settings=s)
     """
     global _DEFAULT_DEPTH_PERSPECTIVE
     previous = _DEFAULT_DEPTH_PERSPECTIVE
-    _DEFAULT_DEPTH_PERSPECTIVE = perspective
+    _DEFAULT_DEPTH_PERSPECTIVE = _as_depth_perspective(perspective)
     try:
         yield
     finally:
@@ -249,8 +259,10 @@ class PlotSettings:
         styling is applied.  The file format is inferred from the extension
         (e.g. ``".png"``, ``".svg"``).  Parent directories are created
         automatically.  When ``None`` (default) no file is written.
-    depth_perspective : DepthPerspective, optional
-        Override the depth coordinate convention for this call only.  When
+    depth_perspective : DepthPerspective | DepthMode, optional
+        Override the depth coordinate convention for this call only.  A bare
+        :class:`DepthMode` is automatically wrapped in a
+        :class:`DepthPerspective` with default display options.  When
         ``None`` (default) the module-level default set by
         :func:`set_depth_perspective` is used (initially
         :attr:`DepthMode.FixedBottom`).  Affects which depth columns are
@@ -287,4 +299,4 @@ class PlotSettings:
     datetime_style: Literal["auto", "concise", "short", "long"] | None = field(default=None)
     output_format: OutputFormat = field(default="svg")
     save_path: str | Path | None = field(default=None)
-    depth_perspective: DepthPerspective | None = field(default=None)
+    depth_perspective: DepthPerspective | DepthMode | None = field(default=None)
