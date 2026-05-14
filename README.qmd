@@ -46,6 +46,14 @@ The marine and hydrokinetic toolkit (MHKiT) can access using the `wave.io.hindca
 
 ## Installation
 
+**[uv](https://docs.astral.sh/uv/getting-started/installation/)** (faster resolver, recommended):
+
+```bash
+uv add us-marine-energy-resource
+```
+
+**pip** (may be slow — pip's dependency resolver backtracks extensively on this package's transitive dependencies):
+
 ```bash
 pip install us-marine-energy-resource
 ```
@@ -581,8 +589,7 @@ print(f"![Joint probability distribution grid, all six sites]({_last_img.url})")
 
 ## Command Line Interface
 
-Installing via pip includes the `us-tidal` CLI for querying and downloading tidal hindcast data
-directly from the command line without Python.
+Installing via uv or pip includes the `us-tidal` CLI for querying and downloading tidal hindcast data directly from the command line without Python.
 
 ### Available options
 

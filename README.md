@@ -40,6 +40,16 @@ coastal regions, generated with the [Finite Volume Community Ocean Model
 
 ## Installation
 
+**[uv](https://docs.astral.sh/uv/getting-started/installation/)**
+(faster resolver, recommended):
+
+``` bash
+uv add us-marine-energy-resource
+```
+
+**pip** (may be slow — pip’s dependency resolver backtracks extensively
+on this package’s transitive dependencies):
+
 ``` bash
 pip install us-marine-energy-resource
 ```
@@ -639,7 +649,7 @@ sites](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-ene
 
 ## Command Line Interface
 
-Installing via pip includes the `us-tidal` CLI for querying and
+Installing via uv or pip includes the `us-tidal` CLI for querying and
 downloading tidal hindcast data directly from the command line without
 Python.
 
@@ -802,7 +812,7 @@ us-tidal 60.73,-151.43
 
       ✓  1 file cached at ~/.us_tidal_cache/marine-energy-data
 
-      Elapsed: 2.2s  (S3 download)
+      Elapsed: 2.0s  (S3 download)
 
 ``` bash
 # Second run - served from local cache
