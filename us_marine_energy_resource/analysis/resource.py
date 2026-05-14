@@ -11,6 +11,8 @@ import pandas as pd
 from numpy.typing import ArrayLike
 from scipy.signal import find_peaks
 
+from .preprocessing import DepthMode, sigma_depth_scalar
+
 logger = logging.getLogger(__name__)
 
 _N_LAYERS = 10
@@ -58,6 +60,7 @@ def select_layer_for_depth(
     df: pd.DataFrame,
     target_depth_m: float,
     relative_to: str = "surface",
+    mode: DepthMode | None = None,
 ) -> tuple[int, float]:
     """Select the sigma layer whose mean depth is closest to a target depth.
 
@@ -72,7 +75,7 @@ def select_layer_for_depth(
     target_depth_m : float
         Target depth in metres (positive value).
     relative_to : {"surface", "sea_floor"}, optional
-        Reference datum for *target_depth_m*:
+        Reference datum for *target_depth_m* used for layer selection:
 
         * ``"surface"`` — depth measured **downward** from the sea surface
           (e.g. ``10.0`` means 10 m below the surface).
@@ -80,13 +83,19 @@ def select_layer_for_depth(
           (e.g. ``10.0`` means 10 m above the seabed).
 
         Default is ``"surface"``.
+    mode : DepthMode, optional
+        Depth coordinate convention for the *returned* depth value.  When
+        ``None`` (default) the active global depth perspective is used (set via
+        ``set_depth_perspective``).  The layer selection itself always uses
+        surface-relative depths internally regardless of this parameter.
 
     Returns
     -------
     layer : int
         Index (0-9) of the best-matching sigma layer.
     layer_mean_depth_m : float
-        Mean depth of the selected sigma layer (m from the sea surface).
+        Mean depth of the selected sigma layer expressed in the coordinate
+        system given by *mode*.
 
     Raises
     ------
@@ -95,6 +104,10 @@ def select_layer_for_depth(
     """
     if relative_to not in {"surface", "sea_floor"}:
         raise ValueError(f"relative_to must be 'surface' or 'sea_floor', got {relative_to!r}")
+
+    if mode is None:
+        from us_marine_energy_resource.viz.settings import get_depth_perspective
+        mode = get_depth_perspective().mode
 
     mean_depths = np.array(
         [float(df[f"vap_sigma_depth_layer_{i}"].mean()) for i in range(_N_LAYERS)]
@@ -107,7 +120,7 @@ def select_layer_for_depth(
         abs_depth = target_depth_m
 
     layer = int(np.argmin(np.abs(mean_depths - abs_depth)))
-    return layer, float(mean_depths[layer])
+    return layer, sigma_depth_scalar(df, layer, mode)
 
 
 def compute_power_density_summary(
