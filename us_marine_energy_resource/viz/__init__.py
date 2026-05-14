@@ -16,6 +16,20 @@ Quick start::
     fig.savefig("velocity_exceedance.png", dpi=300, bbox_inches="tight")
 """
 
-from .settings import OutputFormat, PlotSettings
+from .settings import (
+    DepthPerspective,
+    OutputFormat,
+    PlotSettings,
+    depth_perspective_context,
+    get_depth_perspective,
+    set_depth_perspective,
+)
 
-__all__ = ["OutputFormat", "PlotSettings"]
+__all__ = [
+    "DepthPerspective",
+    "OutputFormat",
+    "PlotSettings",
+    "depth_perspective_context",
+    "get_depth_perspective",
+    "set_depth_perspective",
+]

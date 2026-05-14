@@ -10,8 +10,9 @@ import seaborn as sns
 from matplotlib.figure import Figure
 from scipy.fft import fft, fftfreq  # type: ignore[import-untyped]
 
+from us_marine_energy_resource.analysis.preprocessing import sigma_depth_scalar
 from us_marine_energy_resource.viz._style import styled
-from us_marine_energy_resource.viz.settings import PlotSettings
+from us_marine_energy_resource.viz.settings import PlotSettings, get_depth_perspective
 
 from ._components import _validate_columns
 
@@ -24,6 +25,7 @@ def _utide_imports() -> tuple:
         warnings.filterwarnings("ignore", category=Warning, module="numpy.*")
         from utide import reconstruct, solve  # type: ignore[import-untyped]
     return reconstruct, solve
+
 
 # Known principal tidal constituents: name → period in hours
 _PRINCIPAL_PERIODS: dict[str, float] = {
@@ -99,11 +101,12 @@ def plot_tidal_harmonic_analysis(
         If any required column (speed, u/v components, depth, or latitude)
         is absent from *df*.
     """
+    perspective = get_depth_perspective(settings)
     required = [
         f"vap_sea_water_speed_layer_{layer}",
         f"u_layer_{layer}",
         f"v_layer_{layer}",
-        f"vap_sigma_depth_layer_{layer}",
+        perspective.depth_col(layer),
         "lat_center",
     ]
     _validate_columns(df, required)
@@ -115,7 +118,7 @@ def plot_tidal_harmonic_analysis(
     v: np.ndarray = df[f"v_layer_{layer}"].to_numpy(dtype=float, na_value=np.nan)
     t = df.index.to_numpy()
     lat = float(df["lat_center"].iloc[0])
-    depth_value = float(df[f"vap_sigma_depth_layer_{layer}"].mean())
+    depth_value = sigma_depth_scalar(df, layer, perspective.mode)
 
     # Harmonic analysis via utide (lazy-loaded to defer the numpy warning)
     reconstruct, solve = _utide_imports()
@@ -299,10 +302,11 @@ def plot_fft(
     """
     from ._components import _N_LAYERS, _validate_columns
 
+    perspective = get_depth_perspective(settings)
     _validate_columns(
         df,
         [f"vap_sea_water_speed_layer_{i}" for i in range(_N_LAYERS)]
-        + [f"vap_sigma_depth_layer_{i}" for i in range(_N_LAYERS)],
+        + [perspective.depth_col(i) for i in range(_N_LAYERS)],
     )
 
     colors = sns.color_palette()
@@ -317,7 +321,7 @@ def plot_fft(
         [df[f"vap_sea_water_speed_layer_{i}"].to_numpy(dtype=float) for i in range(_N_LAYERS)]
     )
     all_dep: np.ndarray = np.column_stack(
-        [df[f"vap_sigma_depth_layer_{i}"].to_numpy(dtype=float) for i in range(_N_LAYERS)]
+        [df[perspective.depth_col(i)].to_numpy(dtype=float) for i in range(_N_LAYERS)]
     )
     min_depths = np.min(all_dep, axis=0)
     max_depths = np.max(all_dep, axis=0)
@@ -418,19 +422,20 @@ def plot_tidal_phase_analysis(
 
     from ._components import _validate_columns
 
+    perspective = get_depth_perspective(settings)
     _validate_columns(
         df,
         [
             f"vap_sea_water_speed_layer_{layer}",
             "vap_surface_elevation",
-            f"vap_sigma_depth_layer_{layer}",
+            perspective.depth_col(layer),
         ],
     )
 
     speeds: np.ndarray = df[f"vap_sea_water_speed_layer_{layer}"].to_numpy(dtype=float)
     water_level: np.ndarray = df["vap_surface_elevation"].to_numpy(dtype=float)
     timestamps = df.index
-    depth_value = float(df[f"vap_sigma_depth_layer_{layer}"].mean())
+    depth_value = sigma_depth_scalar(df, layer, perspective.mode)
 
     high_idx, _ = _find_peaks(water_level, distance=5)
     low_idx, _ = _find_peaks(-water_level, distance=5)

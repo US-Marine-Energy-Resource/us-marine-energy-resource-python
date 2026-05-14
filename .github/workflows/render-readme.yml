@@ -3,26 +3,33 @@ name: Render README
 on:
   push:
     branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
 
 jobs:
   render:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           python-version: "3.11"
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
 
       - name: Install package with examples dependencies
-        run: uv pip install -e ".[dev,examples]"
+        run: uv venv && uv pip install -e ".[dev,examples]"
+
+      - name: Add venv to PATH
+        run: echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
 
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
       - name: Render README
         run: quarto render README.qmd --to gfm
+        env:
+          QUARTO_PYTHON: .venv/bin/python
