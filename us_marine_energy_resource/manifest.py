@@ -137,7 +137,7 @@ def find_latest_manifest_s3(
     latest_dir_name = s3_version_dirs[0][0]
     latest_version = ".".join(map(str, s3_version_dirs[0][1]))
     manifest_key = f"{manifest_prefix}{latest_dir_name}/manifest_{latest_version}.json"
-    relative_path = manifest_key[len(s3_cache.prefix) + 1:]
+    relative_path = manifest_key[len(s3_cache.prefix) + 1 :]
     local_path = s3_cache.get(relative_path)
     return local_path, latest_version
 
@@ -433,12 +433,14 @@ class TidalManifestQuery:
             ``distance_km``, ``n_points`` (always 1).
             Returns ``[]`` when the bbox does not intersect any dataset domain.
         """
-        return self.query_all_within_polygon([
-            (lat_min, lon_min),
-            (lat_min, lon_max),
-            (lat_max, lon_max),
-            (lat_max, lon_min),
-        ])
+        return self.query_all_within_polygon(
+            [
+                (lat_min, lon_min),
+                (lat_min, lon_max),
+                (lat_max, lon_max),
+                (lat_max, lon_min),
+            ]
+        )
 
     def query_all_on_line(
         self,
@@ -497,16 +499,18 @@ class TidalManifestQuery:
 
         results: list[dict[str, Any]] = []
         for _, row in df.iterrows():
-            results.append({
-                "face_id": str(row["face_id"]),
-                "centroid": (
-                    float(row["lat_fixed_precision"]) / _COORD_PRECISION_SCALE,
-                    float(row["lon_fixed_precision"]) / _COORD_PRECISION_SCALE,
-                ),
-                "location": str(row["location"]),
-                "frac_along": float(row["frac_along"]),
-                "n_points": 1,
-            })
+            results.append(
+                {
+                    "face_id": str(row["face_id"]),
+                    "centroid": (
+                        float(row["lat_fixed_precision"]) / _COORD_PRECISION_SCALE,
+                        float(row["lon_fixed_precision"]) / _COORD_PRECISION_SCALE,
+                    ),
+                    "location": str(row["location"]),
+                    "frac_along": float(row["frac_along"]),
+                    "n_points": 1,
+                }
+            )
         return results
 
     def query_all_within_polygon(
@@ -535,16 +539,18 @@ class TidalManifestQuery:
 
         results: list[dict[str, Any]] = []
         for _, row in df.iterrows():
-            results.append({
-                "face_id": str(row["face_id"]),
-                "centroid": (
-                    float(row["lat_fixed_precision"]) / _COORD_PRECISION_SCALE,
-                    float(row["lon_fixed_precision"]) / _COORD_PRECISION_SCALE,
-                ),
-                "location": str(row["location"]),
-                "distance_km": float(row["distance_km"]),
-                "n_points": 1,
-            })
+            results.append(
+                {
+                    "face_id": str(row["face_id"]),
+                    "centroid": (
+                        float(row["lat_fixed_precision"]) / _COORD_PRECISION_SCALE,
+                        float(row["lon_fixed_precision"]) / _COORD_PRECISION_SCALE,
+                    ),
+                    "location": str(row["location"]),
+                    "distance_km": float(row["distance_km"]),
+                    "n_points": 1,
+                }
+            )
         return results
 
     def get_file_path(self, face_result: dict[str, Any]) -> str:
@@ -567,4 +573,3 @@ class TidalManifestQuery:
             [str(lat), str(lon), face_result["face_id"]],
             face_result["location"],
         )
-

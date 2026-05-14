@@ -144,7 +144,11 @@ def _plot_sigma_layers(
     else:
         ax.set_ylim(min(all_y), max(all_y))
 
-    if show_surface_elevation and surface_positions and perspective.mode in (DepthMode.FixedBottom, DepthMode.Navd88Elevation):
+    if (
+        show_surface_elevation
+        and surface_positions
+        and perspective.mode in (DepthMode.FixedBottom, DepthMode.Navd88Elevation)
+    ):
         ax.plot(
             time_nums,
             surface_positions,

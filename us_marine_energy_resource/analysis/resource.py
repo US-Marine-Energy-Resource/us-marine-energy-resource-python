@@ -107,6 +107,7 @@ def select_layer_for_depth(
 
     if mode is None:
         from us_marine_energy_resource.viz.settings import get_depth_perspective
+
         mode = get_depth_perspective().mode
 
     mean_depths = np.array(
@@ -417,8 +418,6 @@ def calculate_tidal_levels(
     }
 
 
-
-
 class SiteSummaryMetrics(TypedDict):
     """Aggregated resource metrics for one tidal candidate site.
 
@@ -500,18 +499,18 @@ def collect_site_metrics(
 
 # (display_name, filter_key, column_prefix, units, is_directional)
 _LAYER_CATEGORIES: list[tuple[str, str, str, str, bool]] = [
-    ("Speed",         "speed",     "vap_sea_water_speed_layer_",          "m/s",  False),
-    ("Direction",     "direction", "vap_sea_water_to_direction_layer_",   "°",    True),
-    ("Power Density", "power",     "vap_sea_water_power_density_layer_",  "W/m²", False),
-    ("Depth",         "depth",     "vap_sigma_depth_layer_",              "m",    False),
-    ("Height",        "depth",     "vap_sigma_height_layer_",             "m",    False),
+    ("Speed", "speed", "vap_sea_water_speed_layer_", "m/s", False),
+    ("Direction", "direction", "vap_sea_water_to_direction_layer_", "°", True),
+    ("Power Density", "power", "vap_sea_water_power_density_layer_", "W/m²", False),
+    ("Depth", "depth", "vap_sigma_depth_layer_", "m", False),
+    ("Height", "depth", "vap_sigma_height_layer_", "m", False),
 ]
 
 # (display_name, filter_key, column_names, units)
 _SCALAR_CATEGORIES: list[tuple[str, str, list[str], str]] = [
-    ("Water Level", "depth",    ["vap_surface_elevation"], "m"),
-    ("Sea Floor",   "depth",    ["vap_sea_floor_depth"],   "m"),
-    ("Position",    "position", ["lat", "lon"],             "°"),
+    ("Water Level", "depth", ["vap_surface_elevation"], "m"),
+    ("Sea Floor", "depth", ["vap_sea_floor_depth"], "m"),
+    ("Position", "position", ["lat", "lon"], "°"),
 ]
 
 
@@ -656,9 +655,7 @@ def _find_layer_for_depth(
         else:
             midpoints.append(float("nan"))
 
-    diffs = [
-        abs(m - target_depth) if not np.isnan(m) else float("inf") for m in midpoints
-    ]
+    diffs = [abs(m - target_depth) if not np.isnan(m) else float("inf") for m in midpoints]
     return int(np.argmin(diffs))
 
 

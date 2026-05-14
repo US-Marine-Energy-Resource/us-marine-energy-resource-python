@@ -66,10 +66,12 @@ def _setup_polar_axes(
 
     if metadata is not None:
         ax.set_title(metadata["name"])
-        bouy_data = "\n".join([
-            f'Lat = {float(metadata["lat"]):0.2f}\u00b0',
-            f'Lon = {float(metadata["lon"]):0.2f}\u00b0',
-        ])
+        bouy_data = "\n".join(
+            [
+                f"Lat = {float(metadata['lat']):0.2f}\u00b0",
+                f"Lon = {float(metadata['lon']):0.2f}\u00b0",
+            ]
+        )
         ax.text(
             -0.3,
             0.80,
@@ -131,8 +133,10 @@ def _render_jpd_scatter(
     velocities_da = _mhkit_convert(velocities)
 
     histogram, dir_edges_raw, vel_edges_raw = _mhkit_histogram(
-        directions.to_numpy(), velocities.to_numpy(),
-        direction_bin_width_deg, velocity_bin_width_ms,
+        directions.to_numpy(),
+        velocities.to_numpy(),
+        direction_bin_width_deg,
+        velocity_bin_width_ms,
     )
     # mhkit returns plain lists for edges; convert so numpy arithmetic works.
     dir_edges: np.ndarray = np.asarray(dir_edges_raw)
@@ -149,7 +153,11 @@ def _render_jpd_scatter(
 
     pts = np.vstack([directions_da.to_numpy(), velocities_da.to_numpy()]).T
     z: np.ndarray = _scipy_interpn(  # type: ignore[call-overload]
-        (dir_bins, vel_bins), histogram, pts, method="splinef2d", bounds_error=False,  # type: ignore[arg-type]
+        (dir_bins, vel_bins),
+        histogram,
+        pts,
+        method="splinef2d",
+        bounds_error=False,  # type: ignore[arg-type]
     )
 
     idx = z.argsort()
@@ -184,9 +192,7 @@ def _set_radial_ticks(ax: Any, rmax: float) -> None:
     from matplotlib.ticker import MaxNLocator
 
     locator = MaxNLocator(nbins=5, steps=[1, 2, 2.5, 5, 10])
-    ring_ticks = np.asarray([
-        t for t in locator.tick_values(0.0, rmax) if 0.0 < t <= rmax
-    ])
+    ring_ticks = np.asarray([t for t in locator.tick_values(0.0, rmax) if 0.0 < t <= rmax])
     ax.set_yticks(ring_ticks)
     ax.set_yticklabels([f"{t:.1f} m/s" for t in ring_ticks])
 

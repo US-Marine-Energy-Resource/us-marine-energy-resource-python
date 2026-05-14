@@ -11,6 +11,7 @@ import pyarrow.parquet as pq
 
 _N_LAYERS = 10
 
+
 class DepthMode(enum.Enum):
     """Depth coordinate convention for sigma-layer data.
 

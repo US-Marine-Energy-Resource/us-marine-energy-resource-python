@@ -53,6 +53,7 @@ def _geometry_out(manifest: dict, location: str) -> Path:
 def _bounds_out(manifest: dict) -> Path:
     return _DATA_DIR / f"location_bounds_v{manifest['manifest_version']}.parquet"
 
+
 # Default manifest URL.  Update this when a new manifest version is published.
 _DEFAULT_MANIFEST_URL = (
     "https://marine-energy-data.s3.us-west-2.amazonaws.com"
@@ -105,7 +106,7 @@ def _b4_url(manifest: dict, location: str) -> str:
 # places (7 d.p. ≈ 1 cm resolution) for row-group pruning; matches _COORD_DECIMAL_PRECISION
 # in _spatial.py — keep the two in sync.
 _COORD_DECIMAL_PRECISION: int = 7
-_COORD_PRECISION_SCALE: int = 10 ** _COORD_DECIMAL_PRECISION
+_COORD_PRECISION_SCALE: int = 10**_COORD_DECIMAL_PRECISION
 
 _GEOMETRY_COLS = f"""\
     '{{location}}'  AS location,
@@ -237,9 +238,7 @@ def _bounds_row(
     }
 
 
-def build_bounds(
-    con: duckdb.DuckDBPyConnection, manifest: dict, tolerance: float
-) -> None:
+def build_bounds(con: duckdb.DuckDBPyConnection, manifest: dict, tolerance: float) -> None:
     """Compute the union mesh boundary per location and write location_bounds parquet."""
     bounds_file = _bounds_out(manifest)
     con.execute("LOAD spatial;")
@@ -262,8 +261,7 @@ def build_bounds(
             parquet = _geometry_out(manifest, location)
             if not parquet.exists():
                 raise FileNotFoundError(
-                    f"{parquet.name} not found. "
-                    "Run without --bounds-only first."
+                    f"{parquet.name} not found. Run without --bounds-only first."
                 ) from None
             source = f"read_parquet('{parquet.as_posix()}')"
 
@@ -301,8 +299,7 @@ def write_data_index(manifest: dict) -> None:
         "manifest_version": manifest["manifest_version"],
         "bounds_file": _bounds_out(manifest).name,
         "geometry_files": {
-            location: _geometry_out(manifest, location).name
-            for location in manifest["locations"]
+            location: _geometry_out(manifest, location).name for location in manifest["locations"]
         },
     }
     out = _DATA_DIR / "data_index.json"

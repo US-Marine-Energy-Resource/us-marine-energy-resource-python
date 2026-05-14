@@ -48,10 +48,10 @@ _SUBMODULES = {"tidal_hindcast"}
 
 # Symbols that live inside a submodule — (submodule_path, attr_name).
 _SYMBOLS: dict[str, tuple[str, str]] = {
-    "S3CacheManager":             (".cache",    "S3CacheManager"),
-    "TidalManifestQuery":         (".manifest", "TidalManifestQuery"),
-    "find_latest_manifest_hpc":   (".manifest", "find_latest_manifest_hpc"),
-    "find_latest_manifest_s3":    (".manifest", "find_latest_manifest_s3"),
+    "S3CacheManager": (".cache", "S3CacheManager"),
+    "TidalManifestQuery": (".manifest", "TidalManifestQuery"),
+    "find_latest_manifest_hpc": (".manifest", "find_latest_manifest_hpc"),
+    "find_latest_manifest_s3": (".manifest", "find_latest_manifest_s3"),
 }
 
 

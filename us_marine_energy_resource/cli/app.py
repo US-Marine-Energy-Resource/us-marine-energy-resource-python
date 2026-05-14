@@ -91,7 +91,7 @@ app = typer.Typer(
         "us-tidal 60.73,-151.43 --csv                        Export CSV to current dir\n\n"
         "us-tidal 60.73,-151.43 --csv --output-dir ./data    Export CSV to ./data\n\n"
         "Config file ([italic]~/.us_tidal.toml[/italic]) sets defaults for AWS, cache, and HPC options."
-    )
+    ),
 )
 def main(
     # ----- Geometry (exactly one required) -----
@@ -113,7 +113,9 @@ def main(
     ] = None,
     file: Annotated[
         Path | None,
-        typer.Option("--file", "-f", help=f"Polygon from a GeoJSON file. Draw one at {_link(GEOJSON_TOOL)}."),
+        typer.Option(
+            "--file", "-f", help=f"Polygon from a GeoJSON file. Draw one at {_link(GEOJSON_TOOL)}."
+        ),
     ] = None,
     wkt: Annotated[
         str | None,
@@ -145,10 +147,10 @@ def main(
     # -- validate geometry (exactly one active) --
     geometry_sources = {
         "lat,lon (positional)": location is not None,
-        "--coord":              bool(coord),
-        "--bbox":               bbox is not None,
-        "--file":               file is not None,
-        "--wkt":                wkt is not None,
+        "--coord": bool(coord),
+        "--bbox": bbox is not None,
+        "--file": file is not None,
+        "--wkt": wkt is not None,
     }
     active = [name for name, present in geometry_sources.items() if present]
 

@@ -26,6 +26,7 @@ def _utide_imports() -> tuple:
         from utide import reconstruct, solve  # type: ignore[import-untyped]
     return reconstruct, solve
 
+
 # Known principal tidal constituents: name → period in hours
 _PRINCIPAL_PERIODS: dict[str, float] = {
     "M2": 12.42,
