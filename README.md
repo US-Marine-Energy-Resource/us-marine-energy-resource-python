@@ -65,7 +65,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from us_marine_energy_resource import tidal_hindcast as tidal
-from us_marine_energy_resource.tidal_hindcast import PlotSettings
+from us_marine_energy_resource.tidal_hindcast import DepthMode, DepthPerspective, PlotSettings
 
 # Cook Inlet near Nikiski AK,
 lat=60.735016
@@ -159,6 +159,55 @@ tidal.plot_sigma_layers_direction(df, settings=settings)
 
 ![3-day direction across sigma layers — Cook Inlet near Nikiski,
 AK](docs/images/quickstart-sigma-direction-3day.png)
+
+### Depth perspective
+
+All visualizations that show depth or elevation on an axis respect a
+configurable *depth perspective* passed through `DepthPerspective`. Four
+reference frames are available:
+
+| Mode | Reference | Axis direction |
+|----|----|----|
+| `DepthMode.FixedBottom` | Instantaneous seafloor | Height increases upward from 0 |
+| `DepthMode.FixedSurface` | Instantaneous sea surface | Depth increases downward from 0 |
+| `DepthMode.Navd88Depth` | NAVD88 datum | Depth increases downward |
+| `DepthMode.Navd88Elevation` | NAVD88 datum | Elevation increases upward |
+
+Pass a `DepthPerspective` via `PlotSettings` to control the perspective
+for a single call. The example below uses `FixedSurface` — the classic
+oceanographic convention with the sea surface at zero and depth
+increasing downward:
+
+``` python
+tidal.plot_sigma_layers_speed(
+    df,
+    settings=PlotSettings(
+        title=f"3 Days | Current Speed | Fixed Surface | {location_name}",
+        start_date=start_date,
+        end_date=end_date,
+        fig_width=8,
+        fig_height=3,
+        caption=f"Latitude: {lat}, Longitude: {lon}",
+        depth_perspective=DepthPerspective(mode=DepthMode.FixedSurface),
+        save_path="docs/images/quickstart-sigma-speed-3day-surface.png",
+    ),
+)
+```
+
+![3-day current speed — fixed-surface perspective — Cook Inlet near
+Nikiski, AK](docs/images/quickstart-sigma-speed-3day-surface.png)
+
+The default and recommended perspective for tidal energy work is
+`FixedBottom`: height above the seafloor, with the seafloor anchored at
+zero and the water column growing upward as the tide floods. Setting it
+once at the start of a session applies it to all subsequent plots
+automatically:
+
+``` python
+tidal.set_depth_perspective(DepthPerspective(mode=DepthMode.FixedBottom))
+```
+
+All visualizations below use `FixedBottom`.
 
 The same `df` can be used to visualize tidal joint probability
 distributions (single sigma layer) and velocity exceedance curves
@@ -726,7 +775,7 @@ us-tidal 60.73,-151.43
 
       ✓  1 file cached at ~/.us_tidal_cache/marine-energy-data
 
-      Elapsed: 2.0s  (S3 download)
+      Elapsed: 2.2s  (S3 download)
 
 ``` bash
 # Second run — served from local cache
@@ -752,7 +801,7 @@ us-tidal 60.73,-151.43
 
       ✓  1 file cached at ~/.us_tidal_cache/marine-energy-data
 
-      Elapsed: 1.0s  (local cache)
+      Elapsed: 1.2s  (local cache)
 
 ### Area query — all grid points in a bounding box
 
