@@ -7,7 +7,7 @@ import seaborn as sns
 from matplotlib.figure import Figure
 
 from us_marine_energy_resource.viz._style import styled
-from us_marine_energy_resource.viz.settings import PlotSettings
+from us_marine_energy_resource.viz.settings import PlotSettings, get_depth_perspective
 
 from ._components import _N_LAYERS
 
@@ -55,6 +55,8 @@ def plot_velocity_exceedance(
     if layers is None:
         layers = list(range(_N_LAYERS))
 
+    perspective = get_depth_perspective(settings)
+
     max_key_percentiles: list[float] = [50, 25, 10, 5, 1, 0.1]
     min_key_percentiles: list[float] = [50, 25, 10]
     if key_percentiles is None:
@@ -78,7 +80,7 @@ def plot_velocity_exceedance(
         velocities: np.ndarray = df[f"vap_sea_water_speed_layer_{layer}"].to_numpy(
             dtype=float, na_value=np.nan
         )
-        depth: float = float(df[f"vap_sigma_depth_layer_{layer}"].iloc[0])
+        depth: float = float(df[perspective.depth_col(layer)].iloc[0])
 
         sorted_velocities = np.sort(velocities)[::-1]
         exceedance_pct = np.arange(1, len(sorted_velocities) + 1) / len(sorted_velocities) * 100
@@ -214,6 +216,8 @@ def plot_power_exceedance(
     if layers is None:
         layers = list(range(_N_LAYERS))
 
+    perspective = get_depth_perspective(settings)
+
     if key_percentiles is None:
         key_percentiles = [50, 25, 10, 5, 1, 0.1]
 
@@ -226,7 +230,7 @@ def plot_power_exceedance(
         power: np.ndarray = df[f"vap_sea_water_power_density_layer_{layer}"].to_numpy(
             dtype=float, na_value=np.nan
         )
-        depth: float = float(df[f"vap_sigma_depth_layer_{layer}"].iloc[0])
+        depth: float = float(df[perspective.depth_col(layer)].iloc[0])
 
         sorted_power = np.sort(power)[::-1]
         exceedance_pct = np.arange(1, len(sorted_power) + 1) / len(sorted_power) * 100
@@ -302,12 +306,14 @@ def plot_tidal_exceedance(
     if layers is None:
         layers = [0, 4, 9]
 
+    perspective = get_depth_perspective(settings)
+
     required: list[str] = []
     for layer in layers:
         required += [
             f"vap_sea_water_speed_layer_{layer}",
             f"vap_sea_water_power_density_layer_{layer}",
-            f"vap_sigma_depth_layer_{layer}",
+            perspective.depth_col(layer),
         ]
     _validate_columns(df, required)
 
@@ -319,7 +325,7 @@ def plot_tidal_exceedance(
         power = df[f"vap_sea_water_power_density_layer_{layer}"].to_numpy(
             dtype=float, na_value=np.nan
         )
-        depth = float(df[f"vap_sigma_depth_layer_{layer}"].mean())
+        depth = float(df[perspective.depth_col(layer)].mean())
         n = len(speeds)
         exc = np.arange(1, n + 1) / n * 100
 
@@ -398,6 +404,8 @@ def plot_multi_site_exceedance_overlay(
     """
     _key_percentiles: list[float] = [50, 25, 10, 5, 1, 0.1]
     _show_pct = show_cut_in_line if show_generating_pct is None else show_generating_pct
+
+    perspective = get_depth_perspective(settings)
 
     fig, ax = plt.subplots(figsize=(13, 7))
     stats: dict[str, dict[str, float]] = {}
