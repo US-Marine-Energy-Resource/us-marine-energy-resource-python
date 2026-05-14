@@ -1,6 +1,15 @@
 # US Marine Energy Resource
 
 
+- [Overview](#overview)
+- [Installation](#installation)
+- [Tidal Quick Start](#tidal-quick-start)
+- [Dataset Variables](#dataset-variables)
+- [Multi-Site Comparison](#multi-site-comparison)
+- [Command Line Interface](#command-line-interface)
+- [Direct Downloads using the `tidal_hindcast`
+  API](#direct-downloads-using-the-tidal_hindcast-api)
+
 ## Overview
 
 `us-marine-energy-resource` is a Python library for accessing the [U.S.
@@ -20,10 +29,10 @@ coastal regions, generated with the [Finite Volume Community Ocean Model
 
 > [!NOTE]
 >
-> At this time this libary does not support for the U.S. DOE H20 wave
-> energy hindcast dataset. The marine and hydrokinetic toolkit (MHKiT)
-> can access using the `wave.io.hindcast` module showcased in this [wave
-> hindcast
+> At this time this libary does not provide support for the U.S. DOE H20
+> wave energy hindcast dataset. The marine and hydrokinetic toolkit
+> (MHKiT) can access using the `wave.io.hindcast` module showcased in
+> this [wave hindcast
 > example](https://mhkit-software.github.io/MHKiT/WPTO_hindcast_example.html)
 > that leverages the [NLR Resource eXtraction tool
 > (rex)](https://github.com/NatLabRockies/rex) to access wave hindcast
@@ -65,7 +74,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from us_marine_energy_resource import tidal_hindcast as tidal
-from us_marine_energy_resource.tidal_hindcast import PlotSettings
+from us_marine_energy_resource.tidal_hindcast import DepthMode, PlotSettings
 
 # Cook Inlet near Nikiski AK,
 lat=60.735016
@@ -107,7 +116,7 @@ settings=PlotSettings(
 tidal.plot_sigma_layers_speed(df, settings=settings)
 ```
 
-![Full year current speed across sigma layers — Cook Inlet near Nikiski,
+![Full year current speed across sigma layers, Cook Inlet near Nikiski,
 AK](docs/images/quickstart-sigma-speed-year.png)
 
 Additionally we can plot direction \[deg clockwise from true north\] at
@@ -120,7 +129,7 @@ settings.save_path = "docs/images/quickstart-sigma-direction-year.png"
 tidal.plot_sigma_layers_direction(df, settings=settings)
 ```
 
-![Full year direction across sigma layers — Cook Inlet near Nikiski,
+![Full year direction across sigma layers, Cook Inlet near Nikiski,
 AK](docs/images/quickstart-sigma-direction-year.png)
 
 It is also possible to zoom into specific start dates within the model
@@ -147,7 +156,7 @@ settings = PlotSettings(
 tidal.plot_sigma_layers_speed(df, settings=settings)
 ```
 
-![3-day current speed across sigma layers — Cook Inlet near Nikiski,
+![3-day current speed across sigma layers, Cook Inlet near Nikiski,
 AK](docs/images/quickstart-sigma-speed-3day.png)
 
 ``` python
@@ -157,8 +166,56 @@ settings.save_path = "docs/images/quickstart-sigma-direction-3day.png"
 tidal.plot_sigma_layers_direction(df, settings=settings)
 ```
 
-![3-day direction across sigma layers — Cook Inlet near Nikiski,
+![3-day direction across sigma layers, Cook Inlet near Nikiski,
 AK](docs/images/quickstart-sigma-direction-3day.png)
+
+### Depth perspective
+
+All visualizations that show depth or elevation on an axis respect a
+configurable depth perspective. Four reference frames are available:
+
+| Mode | Reference | Axis direction |
+|----|----|----|
+| `DepthMode.FixedBottom` | Instantaneous seafloor | Height increases upward from 0 |
+| `DepthMode.FixedSurface` | Instantaneous sea surface | Depth increases downward from 0 |
+| `DepthMode.Navd88Depth` | NAVD88 datum | Depth increases downward |
+| `DepthMode.Navd88Elevation` | NAVD88 datum | Elevation increases upward |
+
+Pass a `DepthMode` via `PlotSettings` to control the perspective for a
+single call. The example below uses `FixedSurface`, the classic
+oceanographic convention with the sea surface at zero and depth
+increasing downward:
+
+``` python
+tidal.plot_sigma_layers_speed(
+    df,
+    settings=PlotSettings(
+        title=f"3 Days | Current Speed | Fixed Surface | {location_name}",
+        start_date=start_date,
+        end_date=end_date,
+        fig_width=8,
+        fig_height=3,
+        caption=f"Latitude: {lat}, Longitude: {lon}",
+        depth_perspective=DepthMode.FixedSurface,
+        save_path="docs/images/quickstart-sigma-speed-3day-surface.png",
+    ),
+)
+```
+
+![3-day current speed, fixed-surface perspective, Cook Inlet near
+Nikiski, AK](docs/images/quickstart-sigma-speed-3day-surface.png)
+
+The default and recommended perspective for tidal energy work is
+`FixedBottom`: height above the seafloor, with the seafloor anchored at
+zero and the water column growing upward as the tide floods. Setting it
+once at the start of a session applies it to all subsequent plots
+automatically:
+
+``` python
+tidal.set_depth_perspective(DepthMode.FixedBottom)
+```
+
+All visualizations below use `FixedBottom`.
 
 The same `df` can be used to visualize tidal joint probability
 distributions (single sigma layer) and velocity exceedance curves
@@ -177,7 +234,7 @@ tidal.generate_tidal_joint_probability(
 )
 ```
 
-![Joint probability distribution at sigma layer 4 — Cook Inlet near
+![Joint probability distribution at sigma layer 4, Cook Inlet near
 Nikiski, AK](docs/images/quickstart-jpd-layer-4.png)
 
 ``` python
@@ -193,7 +250,7 @@ _, stats = tidal.plot_velocity_exceedance(
 )
 ```
 
-![Velocity exceedance across all sigma layers — Cook Inlet near Nikiski,
+![Velocity exceedance across all sigma layers, Cook Inlet near Nikiski,
 AK](docs/images/quickstart-velocity-exceedance.png)
 
 `plot_velocity_profile_with_histograms` produces a five-panel diagnostic
@@ -203,7 +260,7 @@ spread and whiskers; a depth vs. speed scatter colored by direction with
 quadratic mean and maximum fit curves; and per-layer histograms of
 current speed, current direction, and sigma-layer depth. Before
 plotting, dry time steps and anomalously thin (“smushed”) sigma layers
-are removed — the data-quality summary in the top-left corner reports
+are removed; the data-quality summary in the top-left corner reports
 what was filtered.
 
 ``` python
@@ -219,60 +276,195 @@ tidal.plot_velocity_profile_with_histograms(
 )
 ```
 
-![Velocity profile with histograms — Cook Inlet near Nikiski,
+![Velocity profile with histograms, Cook Inlet near Nikiski,
 AK](docs/images/quickstart-velocity-profile.png)
 
 ## Dataset Variables
 
 The [full variable
 reference](https://us-marine-energy-resource.github.io/tidal/high_resolution_hindcast/variables/)
-documents every field in the dataset. The key summary variables
-(available in the manifest for every grid point) are:
+documents every field in the dataset. The table and metadata below are
+generated directly from the parquet schema of the downloaded file.
 
-| Variable | Units | Description |
-|----|----|----|
-| [Mean Current Speed](https://us-marine-energy-resource.github.io/tidal/high_resolution_hindcast/variables/mean-current-speed/) | m/s | Annual average depth-averaged current speed |
-| [95th Percentile Current Speed](https://us-marine-energy-resource.github.io/tidal/high_resolution_hindcast/variables/95th-percentile-current-speed/) | m/s | Extreme current speed, outlier-tolerant |
-| [Mean Power Density](https://us-marine-energy-resource.github.io/tidal/high_resolution_hindcast/variables/mean-power-density/) | W/m² | Annual average depth-averaged kinetic energy flux |
-| [95th Percentile Power Density](https://us-marine-energy-resource.github.io/tidal/high_resolution_hindcast/variables/95th-percentile-power-density/) | W/m² | Extreme power density, robust to cubic-velocity sensitivity |
-| [Tidal Range](https://us-marine-energy-resource.github.io/tidal/high_resolution_hindcast/variables/tidal-range/) | m | Max − min sea surface elevation over the hindcast year |
-| [Minimum Water Depth](https://us-marine-energy-resource.github.io/tidal/high_resolution_hindcast/variables/minimum-water-depth/) | m | Minimum depth over the hindcast year (navigation constraint) |
-| [Full Year S3 URI](https://us-marine-energy-resource.github.io/tidal/high_resolution_hindcast/variables/full_year_s3_uri/) | — | Direct S3 link to the time-series parquet for each grid point |
+Column names prefixed with `vap_` are **Value Added Products**:
+quantities derived from the raw model output (e.g. speed computed from
+u/v components, power density from speed). Pass `return_metadata=True`
+to `get_data_at_point` to receive CF-convention variable and file-level
+metadata alongside the DataFrame.
 
-The time-series parquet (one file per grid point) contains hourly or
-half-hourly records for one year with columns for speed, direction,
-power density, and sigma-layer depth bounds at all 10 vertical levels.
+Layered variables span all 10 sigma layers (layer 0 = sea surface, layer
+9 = near-seafloor) and are collapsed to a single row.
 
-Using a downloaded dataframe as an example, the column names for speed,
-direction, power density, and sigma-layer depth bounds at each of the 10
-vertical levels are:
+| Variable | Label | Units |
+|:---|:---|:---|
+| vap_sea_water_speed_layer\_(0–9) | Sea Water Speed | m s-1 |
+| vap_water_column_max_sea_water_speed | Depth maximum Sea Water Speed | m s-1 |
+| vap_water_column_mean_sea_water_speed | Depth averaged Sea Water Speed | m s-1 |
+| vap_sea_water_power_density_layer\_(0–9) | Sea Water Power Density | W m-2 |
+| vap_water_column_max_sea_water_power_density | Depth maximum Sea Water Power Density | W m-2 |
+| vap_water_column_mean_sea_water_power_density | Depth averaged Sea Water Power Density | W m-2 |
+| vap_sea_water_to_direction_layer\_(0–9) | Sea Water Velocity To Direction | degree |
+| vap_water_column_mean_sea_water_to_direction | Depth averaged Sea Water Velocity To Direction | degree |
+| vap_surface_elevation | Sea Surface Elevation Relative to Mean Sea Level | m |
+| u_layer\_(0–9) | Eastward Water Velocity | m s-1 |
+| v_layer\_(0–9) | Northward Water Velocity | m s-1 |
+| vap_sigma_depth_layer\_(0–9) | Depth Below Sea Surface at Sigma Levels | m |
+| element_corner_1_lat | Nodal Latitude | degrees_north |
+| element_corner_1_lon | Nodal Longitude | degrees_east |
+| element_corner_2_lat | Nodal Latitude | degrees_north |
+| element_corner_2_lon | Nodal Longitude | degrees_east |
+| element_corner_3_lat | Nodal Latitude | degrees_north |
+| element_corner_3_lon | Nodal Longitude | degrees_east |
+| vap_sea_floor_depth | Water Depth from Sea Surface to Seafloor | m |
+| vap_water_column_mean_u | Depth averaged Eastward Water Velocity | m s-1 |
+| vap_water_column_mean_v | Depth averaged Northward Water Velocity | m s-1 |
+| vap_zeta_center | Sea Surface Height at Cell Centers from NAVD88 | m from NAVD88 |
+
+### Variable Metadata
+
+Each column carries full CF-convention metadata accessible via
+`return_metadata=True`. Here is the complete attribute set for
+`vap_sea_water_power_density_layer_0` as an example:
 
 ``` python
-df
+_, file_meta, var_meta = tidal.get_data_at_point(lat=lat, lon=lon, return_metadata=True)
+
+pd.DataFrame(var_meta["vap_sea_water_power_density_layer_0"].items(), columns=["Attribute", "Value"])
 ```
 
-## Usage examples
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+&#10;    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+&#10;    .dataframe thead th {
+        text-align: right;
+    }
+</style>
 
-The following sections walk through data retrieval and three core
-visualizations — time series, velocity exceedance, and joint probability
-distribution — for six candidate tidal energy sites across the US.
+|  | Attribute | Value |
+|----|----|----|
+| 0 | long_name | Sea Water Power Density |
+| 1 | units | W m-2 |
+| 2 | grid | fvcom_grid |
+| 3 | type | data |
+| 4 | mesh | fvcom_mesh |
+| 5 | location | face |
+| 6 | coverage_content_type | modelResult |
+| 7 | additional_processing | Computed using the fluid power density equatio... |
+| 8 | computation | sea_water_power_density = 0.5 \* rho \* sea_wate... |
+| 9 | input_variables | sea_water_speed (m/s), rho=\`1025.0\` (kg/m³) |
+| 10 | citation | Haas, Kevin A., et al. 'Assessment of Energy P... |
 
-### Site definitions
+</div>
+
+### Dataset Metadata
+
+Each parquet file in this dataset also contains metadata that describes
+the dataset:
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+&#10;    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+&#10;    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+|  | Attribute | Value |
+|----|----|----|
+| 0 | WPTO_HINDCAST_FORMAT_VERSION | 1.0 |
+| 1 | WPTO_HINDCAST_METADATA_TYPE | netcdf_compatible |
+| 2 | Conventions | CF-1.10, ACDD-1.3, ME Data Pipeline-1.0 |
+| 3 | acknowledgement | This work was funded by the U.S. Department of... |
+| 4 | code_url | https://github.com/NREL/Marine_Energy_Resource... |
+| 5 | code_version | 1.0.0 |
+| 6 | creator_country | USA |
+| 7 | creator_email | zhaoqing.yang@pnnl.gov |
+| 8 | creator_institution | Pacific Northwest National Laboratory (PNNL) |
+| 9 | creator_institution_url | https://www.pnnl.gov/ |
+| 10 | creator_name | Zhaoqing Yang |
+| 11 | creator_sector | gov_federal |
+| 12 | creator_state | Washington |
+| 13 | creator_type | institution |
+| 14 | creator_url | https://www.pnnl.gov/projects/ocean-dynamics-m... |
+| 15 | contributor_name | Mithun Deb, Preston Spicer, Taiping Wang, Levi... |
+| 16 | contributor_role | author, author, author, author, author, proces... |
+| 17 | contributor_role_vocabulary | https://vocab.nerc.ac.uk/collection/G04/current/ |
+| 18 | contributor_url | https://www.pnnl.gov, www.nrel.gov |
+| 19 | data_level | b1 |
+| 20 | dataset_name | wpto_high_res_tidal.ak_cook_inlet.v1.0.0 |
+| 21 | datastream | wpto_high_res_tidal.ak_cook_inlet.b1.v1.0.0 |
+| 22 | description | High-resolution tidal energy resource hindcas... |
+| 23 | featureType | timeSeries |
+| 24 | geospatial_lat_units | degrees_north |
+| 25 | geospatial_lon_units | degrees_east |
+| 26 | geospatial_vertical_origin | geoid |
+| 27 | geospatial_vertical_positive | down |
+| 28 | geospatial_vertical_units | m |
+| 29 | history | Ran by asimms on x1003c2s1b1n1 (OS: Linux, Ker... |
+| 30 | id | AK_cook_inlet.wpto_high_res_tidal.v1.0.0 |
+| 31 | infoURL | https://www.github.com/nrel/marine_energy_reso... |
+| 32 | inputs | \['/kfs2/projects/hindcastra/Tidal/datasets/hig... |
+| 33 | keywords | OCEAN TIDES, TIDAL ENERGY, VELOCITY, SPEED, DI... |
+| 34 | license | Freely Distributed |
+| 35 | naming_authority | gov.nrel.water_power |
+| 36 | references | Deb, Mithun, Zhaoqing Yang, and Taiping Wang. ... |
+| 37 | temporal | hourly |
+| 38 | date_created | 2023-02-07T20:23:00 |
+| 39 | date_issued | 2025-11-12 |
+| 40 | date_metadata_modified | 2025-11-20T19:46:18.682654+00:00 |
+| 41 | date_modified | 2025-11-20T19:46:18.682654+00:00 |
+| 42 | processing_level | b1 |
+| 43 | product_version | 1.0.0 |
+| 44 | program | U.S. Department of Energy (DOE) Office of Ener... |
+| 45 | project | High Resolution Tidal Hindcast |
+| 46 | summary | High-resolution tidal energy resource hindcas... |
+| 47 | publisher_country | USA |
+| 48 | publisher_email | michael.lawson@nrel.gov |
+| 49 | publisher_institution | National Renewable Energy Laboratory (NREL) |
+| 50 | publisher_name | Michael Lawson |
+| 51 | publisher_state | Colorado |
+| 52 | publisher_type | institution |
+| 53 | publisher_url | https://www.nrel.gov |
+| 54 | source | FVCOM_4.3.1 |
+| 55 | title | High Resolution Tidal Hindcast for Cook Inlet,... |
+
+</div>
+
+## Multi-Site Comparison
+
+The following sections walk through data retrieval and core
+visualizations for a multi site comparison of multiple tidal energy
+sites across the US.
+
+### Site Definitions
+
+To start we define the coordinates and names of the tidal sites we want
+to compare and same them in a python dictionary.
 
 ``` python
 sites = [
-    {"label": "Upper Cook Inlet, AK",            "lat": 60.735016,  "lon": -151.431396},
-    {"label": "Tacoma Narrows, WA",              "lat": 47.270191,  "lon": -122.548172},
-    {"label": "Admiralty Inlet, WA",             "lat": 48.173931,  "lon": -122.774963},
-    {"label": "UNH Living Bridge, NH",           "lat": 43.079498,  "lon": -70.752319},
+    {"label": "Upper Cook Inlet, AK", "lat": 60.735016, "lon": -151.431396},
+    {"label": "Tacoma Narrows, WA", "lat": 47.270191, "lon": -122.548172},
+    {"label": "Admiralty Inlet, WA", "lat": 48.173931, "lon": -122.774963},
+    {"label": "UNH Living Bridge, NH", "lat": 43.079498, "lon": -70.752319},
     {"label": "Moose Island, Western Passage, ME", "lat": 44.920837, "lon": -66.988762},
-    {"label": "False Pass, Aleutian Islands, AK", "lat": 54.803799,  "lon": -163.364441},
+    {"label": "False Pass, Aleutian Islands, AK", "lat": 54.803799, "lon": -163.364441},
 ]
 
 cook_inlet = sites[0]
 ```
 
-### Load data for all sites
+### Loading Data for All Sites
 
 `get_data_at_point` finds the nearest grid point in the manifest and
 downloads (or returns from cache) the full-year time-series parquet. It
@@ -309,139 +501,10 @@ for site in sites:
     Loading False Pass, Aleutian Islands, AK …
       8,760 timesteps  (2010-06-03 → 2011-06-02)
 
-## Primary site deep-dive — Upper Cook Inlet, AK
-
-Cook Inlet has some of the most energetic tidal currents in North
-America. Spring tidal ranges exceed 9 m and the geometry of the upper
-inlet amplifies current speeds to 3–4 m/s — among the highest in the US.
-It is a natural first site for demonstrating what this dataset reveals
-about the vertical structure and variability of a tidal energy resource.
-
-### Current speed across depth and time
-
-The depth-time cross-section shows current speed across all 10 sigma
-layers for the full hindcast year. Each band spans one sigma layer —
-equal fractions of the water column from surface to seafloor. The
-spring–neap cycle, the tidal asymmetry between flood and ebb, and the
-vertical shear between the fast surface and slower near-bed layers are
-all directly visible.
+### Setup: Depth and Layer Selection
 
 ``` python
-df_primary = site_data[cook_inlet["label"]]
-lat, lon = cook_inlet["lat"], cook_inlet["lon"]
-
-tidal.plot_sigma_layers_speed(
-    df_primary,
-    settings=PlotSettings(
-        title=f"Current Speed Across Sigma Layers — {cook_inlet['label']}",
-        fig_height=3,
-        fig_width=8,
-        caption=f"Latitude: {lat}, Longitude: {lon}",
-        save_path="docs/images/cook-inlet-sigma-speed.png",
-    ),
-)
-```
-
-![Current speed across sigma layers — Upper Cook Inlet,
-AK](docs/images/cook-inlet-sigma-speed.png)
-
-### Velocity exceedance
-
-Exceedance probability curves across all ten sigma layers. Annotated
-percentiles show the current speed exceeded for 50%, 25%, 10%, … of the
-hindcast record — the key inputs for turbine capacity-factor estimates.
-
-``` python
-_, exc_stats = tidal.plot_velocity_exceedance(
-    df_primary,
-    settings=PlotSettings(
-        title=f"Velocity Exceedance — {cook_inlet['label']}",
-        fig_width=10,
-        fig_height=5,
-        caption=f"Latitude: {lat}, Longitude: {lon}",
-        save_path="docs/images/cook-inlet-exceedance.png",
-    ),
-)
-```
-
-![Velocity exceedance across all sigma layers — Upper Cook Inlet,
-AK](docs/images/cook-inlet-exceedance.png)
-
-The returned `exc_stats` dict is keyed by `"Layer {i}"` and contains
-per-layer exceedance speeds at each annotated percentile. We can create
-a `pd.DataFrame` from this data to display in tabular form.
-
-``` python
-exc_stats = pd.DataFrame(exc_stats).T[["mean", "5%", "1%", "0.1%", "max"]]
-exc_stats
-```
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-&#10;    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-&#10;    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-
-|         | mean     | 5%       | 1%       | 0.1%     | max      |
-|---------|----------|----------|----------|----------|----------|
-| Layer 0 | 1.845529 | 3.139129 | 3.393487 | 3.543426 | 3.601168 |
-| Layer 1 | 1.795470 | 3.047897 | 3.293689 | 3.438518 | 3.494025 |
-| Layer 2 | 1.746668 | 2.959500 | 3.196892 | 3.339104 | 3.391897 |
-| Layer 3 | 1.695603 | 2.866398 | 3.096244 | 3.235751 | 3.286159 |
-| Layer 4 | 1.640122 | 2.768487 | 2.988489 | 3.123703 | 3.172075 |
-| Layer 5 | 1.577625 | 2.660134 | 2.868485 | 2.998511 | 3.044529 |
-| Layer 6 | 1.503978 | 2.530808 | 2.727775 | 2.852564 | 2.895835 |
-| Layer 7 | 1.411291 | 2.370027 | 2.554669 | 2.670877 | 2.711424 |
-| Layer 8 | 1.280689 | 2.147953 | 2.313955 | 2.418449 | 2.455549 |
-| Layer 9 | 1.041188 | 1.743161 | 1.877486 | 1.960242 | 1.990621 |
-
-</div>
-
-### Joint probability distribution
-
-Polar histogram of current speed vs. direction at the mid-column sigma
-layer (layer 4). Shows the dominant flow direction and how speed is
-distributed across the tidal cycle.
-
-``` python
-tidal.generate_tidal_joint_probability(
-    df_primary,
-    sigma_layer=4,
-    settings=PlotSettings(
-        title=f"Joint Probability Distribution — {cook_inlet['label']}",
-        fig_width=8,
-        fig_height=8,
-        caption=f"Latitude: {lat}, Longitude: {lon}",
-        save_path="docs/images/cook-inlet-jpd-layer-4.png",
-    ),
-)
-```
-
-![Joint probability distribution at sigma layer 4 — Upper Cook Inlet,
-AK](docs/images/cook-inlet-jpd-layer-4.png)
-
-------------------------------------------------------------------------
-
-## All-sites comparison
-
-The following three visualizations compare the same plot type across all
-six candidate sites. A single `analysis_depth` variable controls the
-nominal depth used for layer selection, keeping the exceedance and JPD
-panels on an apples-to-apples basis.
-
-### Setup — depth and layer selection
-
-``` python
-import math
-
-analysis_depth = 10.0  # m — nominal analysis depth
+analysis_depth = 10.0  # nominal analysis depth in meters
 depth_reference = "surface"  # "surface" or "sea_floor"
 
 # Select the sigma layer closest to analysis_depth for each site.
@@ -454,25 +517,27 @@ for site in sites:
     )
     site_layers[site["label"]] = (layer, actual_depth)
     print(
-        f"{site['label']:<40} layer {layer}  "
-        f"(mean depth {actual_depth:.1f} m)"
+        f"{site['label']} layer {layer}  "
+        f"({actual_depth:.1f} m)"
     )
 ```
 
-    Upper Cook Inlet, AK                     layer 2  (mean depth 8.4 m)
-    Tacoma Narrows, WA                       layer 1  (mean depth 9.4 m)
-    Admiralty Inlet, WA                      layer 1  (mean depth 8.8 m)
-    UNH Living Bridge, NH                    layer 4  (mean depth 9.7 m)
-    Moose Island, Western Passage, ME        layer 2  (mean depth 10.0 m)
-    False Pass, Aleutian Islands, AK         layer 2  (mean depth 11.4 m)
+    Upper Cook Inlet, AK layer 2  (25.1 m)
+    Tacoma Narrows, WA layer 1  (53.2 m)
+    Admiralty Inlet, WA layer 1  (49.6 m)
+    UNH Living Bridge, NH layer 4  (11.8 m)
+    Moose Island, Western Passage, ME layer 2  (30.0 m)
+    False Pass, Aleutian Islands, AK layer 2  (34.3 m)
 
-### Current speed across depth and time — all sites
+### Current speed across depth and time: all sites
 
 Each panel covers the full hindcast year at one site. The colorbar range
 is shared across all six: `vmax` is the maximum speed in the dataset,
 rounded up to the nearest 0.5 m/s.
 
 ``` python
+import math
+
 # Compute shared "nice max" colorbar limit.
 all_max_speeds = [
     float(
@@ -490,7 +555,7 @@ for site in sites:
     tidal.plot_sigma_layers_speed(
         site_df,
         settings=PlotSettings(
-            title=f"Current Speed Across Sigma Layers — {site['label']}",
+            title=f"Current Speed Across Sigma Layers | {site['label']}",
             caption=f"Lat: {site['lat']}, Lon: {site['lon']}",
             colorbar_max=speed_vmax,
             fig_width=9,
@@ -500,18 +565,18 @@ for site in sites:
     )
 ```
 
-![Current speed — Upper Cook Inlet,
-AK](docs/images/sigma-speed-upper-cook-inlet-ak.png) ![Current speed —
+![Current speed, Upper Cook Inlet,
+AK](docs/images/sigma-speed-upper-cook-inlet-ak.png) ![Current speed,
 Tacoma Narrows, WA](docs/images/sigma-speed-tacoma-narrows-wa.png)
-![Current speed — Admiralty Inlet,
-WA](docs/images/sigma-speed-admiralty-inlet-wa.png) ![Current speed —
-UNH Living Bridge, NH](docs/images/sigma-speed-unh-living-bridge-nh.png)
-![Current speed — Moose Island, Western Passage,
+![Current speed, Admiralty Inlet,
+WA](docs/images/sigma-speed-admiralty-inlet-wa.png) ![Current speed, UNH
+Living Bridge, NH](docs/images/sigma-speed-unh-living-bridge-nh.png)
+![Current speed, Moose Island, Western Passage,
 ME](docs/images/sigma-speed-moose-island-western-passage-me.png)
-![Current speed — False Pass, Aleutian Islands,
+![Current speed, False Pass, Aleutian Islands,
 AK](docs/images/sigma-speed-false-pass-aleutian-islands-ak.png)
 
-### Velocity exceedance — all sites
+### Velocity exceedance: all sites
 
 All six sites on one figure at their respective analysis-depth layers.
 
@@ -525,7 +590,7 @@ site_records_exc = [
 tidal.plot_multi_site_exceedance_overlay(
     site_records_exc,
     settings=PlotSettings(
-        title=f"Velocity Exceedance — All Sites  (analysis depth ≈ {analysis_depth} m {depth_reference})",
+        title=f"Velocity Exceedance | All Sites (analysis depth ~{analysis_depth} m {depth_reference})",
         fig_height=3,
         fig_width=8,
         save_path="docs/images/all-sites-exceedance-overlay.png",
@@ -533,10 +598,10 @@ tidal.plot_multi_site_exceedance_overlay(
 )
 ```
 
-![Velocity exceedance overlay — all six
+![Velocity exceedance overlay, all six
 sites](docs/images/all-sites-exceedance-overlay.png)
 
-### Joint probability distribution — all sites
+### Joint probability distribution: all sites
 
 2 × 3 grid of JPD polar histograms with a shared color scale.
 
@@ -550,7 +615,7 @@ tidal.plot_jpd_comparison_grid(
     site_records_jpd,
     ncols=2,
     settings=PlotSettings(
-        title=f"Joint Probability Distribution — All Sites  (analysis depth ≈ {analysis_depth} m {depth_reference})",
+        title=f"Joint Probability Distribution | All Sites (analysis depth ~{analysis_depth} m {depth_reference})",
         fig_width=10,
         fig_height=13,
         save_path="docs/images/all-sites-jpd-grid.png",
@@ -558,14 +623,14 @@ tidal.plot_jpd_comparison_grid(
 )
 ```
 
-![Joint probability distribution grid — all six
+![Joint probability distribution grid, all six
 sites](docs/images/all-sites-jpd-grid.png)
 
 ## Command Line Interface
 
 Installing via pip includes the `us-tidal` CLI for querying and
-downloading tidal hindcast data directly from the command line — no
-Python required.
+downloading tidal hindcast data directly from the command line without
+Python.
 
 ### Available options
 
@@ -677,7 +742,7 @@ us-tidal --help
      us-tidal 60.73,-151.43 --csv --output-dir ./data    Export CSV to ./data       
      Config file (~/.us_tidal.toml) sets defaults for AWS, cache, and HPC options.
 
-### Point query — nearest grid point
+### Point query: nearest grid point
 
 `us-tidal` accepts a positional `lat,lon` argument. Start with
 `--dry-run` to check the size before committing to a download.
@@ -703,7 +768,7 @@ On first run the file is fetched from S3. Subsequent calls read from the
 local cache with no network traffic.
 
 ``` bash
-# First run — downloads from S3
+# First run - downloads from S3
 us-tidal 60.73,-151.43
 ```
 
@@ -726,10 +791,10 @@ us-tidal 60.73,-151.43
 
       ✓  1 file cached at ~/.us_tidal_cache/marine-energy-data
 
-      Elapsed: 2.0s  (S3 download)
+      Elapsed: 5.7s  (S3 download)
 
 ``` bash
-# Second run — served from local cache
+# Second run - served from local cache
 us-tidal 60.73,-151.43
 ```
 
@@ -752,12 +817,12 @@ us-tidal 60.73,-151.43
 
       ✓  1 file cached at ~/.us_tidal_cache/marine-energy-data
 
-      Elapsed: 1.0s  (local cache)
+      Elapsed: 0.9s  (local cache)
 
-### Area query — all grid points in a bounding box
+### Area query: all grid points in a bounding box
 
-`--bbox` takes `lat_min,lon_min,lat_max,lon_max`. Use `--dry-run` first
-— bbox queries can match thousands of faces.
+`--bbox` takes `lat_min,lon_min,lat_max,lon_max`. Use `--dry-run` first;
+bbox queries can match thousands of faces.
 
 ``` bash
 us-tidal --bbox 60.725,-151.445,60.735,-151.425 --dry-run
@@ -799,7 +864,7 @@ us-tidal --bbox 60.725,-151.445,60.735,-151.425 --dry-run
 us-tidal --bbox 60.725,-151.445,60.735,-151.425 --output-dir ./data
 ```
 
-### Transect query — grid points along a line
+### Transect query: grid points along a line
 
 `--coord` defines a waypoint; repeat it to build a multi-segment path.
 All faces whose triangles geometrically intersect the path are returned.
@@ -908,13 +973,13 @@ line = query.query_all_on_line(
 print(
     f"Nearest point : face {point['point']['face_id']}"
     f"  ({point['point']['lat']:.4f}, {point['point']['lon']:.4f})"
-    f"  —  {point['distance_km']:.3f} km"
+    f"  -  {point['distance_km']:.3f} km"
 )
 print(f"Area query    : {len(area)} grid centroids in bbox")
 print(f"Line query    : {len(line)} grid centroids along transect")
 ```
 
-    Nearest point : face 00126601  (60.7298, -151.4297)  —  0.000 km
+    Nearest point : face 00126601  (60.7298, -151.4297)  -  0.000 km
     Area query    : 3741 grid centroids in bbox
     Line query    : 126 grid centroids along transect
 

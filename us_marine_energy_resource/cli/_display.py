@@ -63,14 +63,14 @@ def point_result(result: dict[str, Any]) -> None:
     rel = p["file_path"]
 
     rows = [
-        {"field": "face_id",    "value": p["face_id"]},
-        {"field": "location",   "value": result["location"]},
-        {"field": "latitude",   "value": str(p["lat"])},
-        {"field": "longitude",  "value": str(p["lon"])},
-        {"field": "distance",   "value": dist_label},
-        {"field": "file",       "value": rel},
-        {"field": "s3",         "value": s3_uri(rel)},
-        {"field": "url",        "value": _link(http_url(rel))},
+        {"field": "face_id", "value": p["face_id"]},
+        {"field": "location", "value": result["location"]},
+        {"field": "latitude", "value": str(p["lat"])},
+        {"field": "longitude", "value": str(p["lon"])},
+        {"field": "distance", "value": dist_label},
+        {"field": "file", "value": rel},
+        {"field": "s3", "value": s3_uri(rel)},
+        {"field": "url", "value": _link(http_url(rel))},
     ]
 
     table = Table(show_header=False, box=None, padding=(0, 1))
@@ -92,13 +92,15 @@ def faces_table(results: list[dict[str, Any]], max_rows: int = 20) -> None:
     rows = []
     for r in results[:max_rows]:
         lat, lon = r["centroid"]
-        rows.append({
-            "face_id":   r["face_id"],
-            "location":  r["location"],
-            "lat":       round(lat, 5),
-            "lon":       round(lon, 5),
-            "dist_km":   round(r.get("distance_km", 0.0), 2),
-        })
+        rows.append(
+            {
+                "face_id": r["face_id"],
+                "location": r["location"],
+                "lat": round(lat, 5),
+                "lon": round(lon, 5),
+                "dist_km": round(r.get("distance_km", 0.0), 2),
+            }
+        )
 
     df = pd.DataFrame(rows)
     console.print(_df_to_rich_table(df, dim_cols={"face_id"}))
@@ -118,12 +120,14 @@ def size_estimate(
     import pandas as pd
 
     tilde = "~" if is_estimate else ""
-    df = pd.DataFrame([
-        {"metric": "Files matched",    "value": str(n_files)},
-        {"metric": "Total size",       "value": f"{tilde}{total_mb:.1f} MB"},
-        {"metric": "Already cached",   "value": f"{cached_mb:.1f} MB"},
-        {"metric": "To download",      "value": f"{tilde}{to_download_mb:.1f} MB"},
-    ])
+    df = pd.DataFrame(
+        [
+            {"metric": "Files matched", "value": str(n_files)},
+            {"metric": "Total size", "value": f"{tilde}{total_mb:.1f} MB"},
+            {"metric": "Already cached", "value": f"{cached_mb:.1f} MB"},
+            {"metric": "To download", "value": f"{tilde}{to_download_mb:.1f} MB"},
+        ]
+    )
     table = Table(show_header=False, box=None, padding=(0, 2))
     table.add_column(style="dim")
     table.add_column(justify="right")
@@ -145,20 +149,24 @@ def stats_table(local_path: Path, label: str = "Statistics  (surface layer)") ->
 
     rows: list[dict[str, Any]] = []
     s = df[speed_col]
-    rows.append({
-        "metric": "Speed (m/s)",
-        "mean":   round(float(s.mean()), 3),
-        "p90":    round(float(s.quantile(0.9)), 3),
-        "max":    round(float(s.max()), 3),
-    })
+    rows.append(
+        {
+            "metric": "Speed (m/s)",
+            "mean": round(float(s.mean()), 3),
+            "p90": round(float(s.quantile(0.9)), 3),
+            "max": round(float(s.max()), 3),
+        }
+    )
     if power_col in df.columns:
         p = df[power_col]
-        rows.append({
-            "metric": "Power density (W/m²)",
-            "mean":   round(float(p.mean()), 1),
-            "p90":    round(float(p.quantile(0.9)), 1),
-            "max":    round(float(p.max()), 1),
-        })
+        rows.append(
+            {
+                "metric": "Power density (W/m²)",
+                "mean": round(float(p.mean()), 1),
+                "p90": round(float(p.quantile(0.9)), 1),
+                "max": round(float(p.max()), 1),
+            }
+        )
 
     stats_df = pd.DataFrame(rows)
     console.print(_df_to_rich_table(stats_df, title=label))
