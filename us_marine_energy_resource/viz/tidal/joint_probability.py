@@ -12,7 +12,7 @@ from mhkit.utils import convert_to_dataarray as _mhkit_convert  # type: ignore[i
 from scipy.interpolate import interpn as _scipy_interpn
 
 from us_marine_energy_resource.viz._style import styled
-from us_marine_energy_resource.viz.settings import PlotSettings
+from us_marine_energy_resource.viz.settings import PlotSettings, get_depth_perspective
 
 from ._components import _validate_columns
 
@@ -279,10 +279,11 @@ def generate_tidal_joint_probability(
     KeyError
         If required columns are absent from *df*.
     """
+    perspective = get_depth_perspective(settings)
     required = [
         f"vap_sea_water_to_direction_layer_{sigma_layer}",
         f"vap_sea_water_speed_layer_{sigma_layer}",
-        f"vap_sigma_depth_layer_{sigma_layer}",
+        perspective.depth_col(sigma_layer),
         "dataset_name",
         "lat_center",
         "lon_center",
@@ -291,7 +292,7 @@ def generate_tidal_joint_probability(
 
     to_direction = df[f"vap_sea_water_to_direction_layer_{sigma_layer}"]
     speed = df[f"vap_sea_water_speed_layer_{sigma_layer}"]
-    depth = df[f"vap_sigma_depth_layer_{sigma_layer}"]
+    depth = df[perspective.depth_col(sigma_layer)]
 
     time_str = f"Time Range: {df.index[0]} - {df.index[-1]} [UTC]"
     depth_str = f"Depth Range: {depth.min():.2f} - {depth.max():.2f} [m]"
