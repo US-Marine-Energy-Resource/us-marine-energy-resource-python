@@ -41,7 +41,7 @@ coastal regions, generated with the [Finite Volume Community Ocean Model
 ## Installation
 
 ``` bash
-pip install git+https://github.com/US-Marine-Energy-Resource/us-marine-energy-resource-python.git@main
+pip install us-marine-energy-resource
 ```
 
 ## Tidal Quick Start
