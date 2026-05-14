@@ -76,7 +76,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from us_marine_energy_resource import tidal_hindcast as tidal
-from us_marine_energy_resource.tidal_hindcast import DepthMode, DepthPerspective, PlotSettings
+from us_marine_energy_resource.tidal_hindcast import DepthMode, PlotSettings
 
 # Cook Inlet near Nikiski AK,
 lat=60.735016
@@ -164,8 +164,7 @@ tidal.plot_sigma_layers_direction(df, settings=settings)
 ### Depth perspective
 
 All visualizations that show depth or elevation on an axis respect a configurable
-*depth perspective* passed through `DepthPerspective`. Four reference frames are
-available:
+depth perspective. Four reference frames are available:
 
 | Mode | Reference | Axis direction |
 |------|-----------|----------------|
@@ -174,7 +173,7 @@ available:
 | `DepthMode.Navd88Depth` | NAVD88 datum | Depth increases downward |
 | `DepthMode.Navd88Elevation` | NAVD88 datum | Elevation increases upward |
 
-Pass a `DepthPerspective` via `PlotSettings` to control the perspective for a
+Pass a `DepthMode` via `PlotSettings` to control the perspective for a
 single call. The example below uses `FixedSurface`, the classic oceanographic
 convention with the sea surface at zero and depth increasing downward:
 
@@ -188,7 +187,7 @@ tidal.plot_sigma_layers_speed(
         fig_width=8,
         fig_height=3,
         caption=f"Latitude: {lat}, Longitude: {lon}",
-        depth_perspective=DepthPerspective(mode=DepthMode.FixedSurface),
+        depth_perspective=DepthMode.FixedSurface,
         save_path="docs/images/quickstart-sigma-speed-3day-surface.png",
     ),
 )
@@ -202,7 +201,7 @@ column growing upward as the tide floods. Setting it once at the start of a
 session applies it to all subsequent plots automatically:
 
 ```{python}
-tidal.set_depth_perspective(DepthPerspective(mode=DepthMode.FixedBottom))
+tidal.set_depth_perspective(DepthMode.FixedBottom)
 ```
 
 All visualizations below use `FixedBottom`.
@@ -431,6 +430,8 @@ shared across all six: `vmax` is the maximum speed in the dataset, rounded up
 to the nearest 0.5 m/s.
 
 ```{python}
+import math
+
 # Compute shared "nice max" colorbar limit.
 all_max_speeds = [
     float(
