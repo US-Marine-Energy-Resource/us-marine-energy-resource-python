@@ -406,7 +406,7 @@ class S3CacheManager:
     def get_parquet_footer_info(self, relative_path: str) -> dict[str, Any]:
         """Read parquet footer metadata via S3 range requests, caching result as JSON.
 
-        Uses ``s3fs`` (boto3-backed) to open the remote file and passes the
+        Uses ``pyarrow.fs.S3FileSystem`` to open the remote file and passes the
         handle to ``pq.read_metadata``, which issues only the 1–2 range GETs
         needed to fetch the footer.  On subsequent calls the JSON cache is used
         with no S3 access.
@@ -432,18 +432,19 @@ class S3CacheManager:
             except (OSError, json.JSONDecodeError):
                 info_cache_path.unlink(missing_ok=True)
 
-        import s3fs
         import pyarrow.parquet as pq
+        from pyarrow.fs import S3FileSystem, resolve_s3_region
 
         from .analysis.preprocessing import _extract_parquet_footer_info
 
+        region = resolve_s3_region(self.bucket)
         if self.aws_profile:
-            fs = s3fs.S3FileSystem(profile=self.aws_profile)
+            fs = S3FileSystem(profile=self.aws_profile, region=region)
         else:
-            fs = s3fs.S3FileSystem(anon=True)
+            fs = S3FileSystem(anonymous=True, region=region)
 
-        s3_path = f"s3://{self.bucket}/{self._get_s3_key(relative_path)}"
-        with fs.open(s3_path, "rb") as f:
+        s3_key = f"{self.bucket}/{self._get_s3_key(relative_path)}"
+        with fs.open_input_file(s3_key) as f:
             metadata = pq.read_metadata(f)
 
         info = _extract_parquet_footer_info(metadata)
