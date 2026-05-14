@@ -405,8 +405,6 @@ def plot_multi_site_exceedance_overlay(
     _key_percentiles: list[float] = [50, 25, 10, 5, 1, 0.1]
     _show_pct = show_cut_in_line if show_generating_pct is None else show_generating_pct
 
-    perspective = get_depth_perspective(settings)
-
     fig, ax = plt.subplots(figsize=(13, 7))
     stats: dict[str, dict[str, float]] = {}
 
