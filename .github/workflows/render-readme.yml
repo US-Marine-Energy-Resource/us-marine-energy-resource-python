@@ -21,7 +21,7 @@ jobs:
           cache-dependency-glob: "pyproject.toml"
 
       - name: Install package with examples dependencies
-        run: uv pip install -e ".[dev,examples]"
+        run: uv pip install --system -e ".[dev,examples]"
 
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
