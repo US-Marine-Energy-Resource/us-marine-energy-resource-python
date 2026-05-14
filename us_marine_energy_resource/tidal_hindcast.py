@@ -85,7 +85,8 @@ def get_data_at_point(
     max_km: float | None = None,
     cache_dir: Path | None = None,
     verbose: bool = False,
-) -> pd.DataFrame:
+    return_metadata: bool = False,
+) -> pd.DataFrame | tuple[pd.DataFrame, dict[str, str], dict[str, dict[str, str]]]:
     """Fetch tidal hindcast data for the grid point nearest to a coordinate.
 
     Downloads and caches the parquet file from S3 on the first call; subsequent
@@ -105,12 +106,18 @@ def get_data_at_point(
         before the connection is initialized).
     verbose : bool, optional
         If True, print manifest loading and cache details. Defaults to False.
+    return_metadata : bool, optional
+        If True, return ``(df, file_meta, var_meta)`` matching the signature of
+        :func:`load_parquet`. ``file_meta`` contains global dataset attributes
+        (title, institution, source, etc.); ``var_meta`` maps each column name
+        to its CF attribute dict (``long_name``, ``units``, ``description``,
+        etc.). Defaults to False.
 
     Returns
     -------
-    pd.DataFrame
-        Preprocessed tidal hindcast DataFrame with a ``DatetimeIndex`` and
-        all sigma-layer speed, direction, power-density, and depth columns.
+    pd.DataFrame or tuple[pd.DataFrame, dict[str, str], dict[str, dict[str, str]]]
+        Preprocessed tidal hindcast DataFrame. When ``return_metadata=True``,
+        returns ``(df, file_meta, var_meta)``.
 
     Raises
     ------
@@ -125,7 +132,7 @@ def get_data_at_point(
     >>> import us_marine_energy_resource.tidal_hindcast as tidal
     >>> df = tidal.get_data_at_point(lat=60.73, lon=-151.43)
     >>> df = tidal.get_data_at_point(lat=47.27, lon=-122.55, max_km=20.0)
-    >>> df = tidal.get_data_at_point(lat=60.73, lon=-151.43, verbose=True)
+    >>> df, file_meta, var_meta = tidal.get_data_at_point(lat=60.73, lon=-151.43, return_metadata=True)
     """
     _ensure_initialized(cache_dir, verbose=verbose)
     assert _state is not None  # narrowing for type checker
@@ -148,8 +155,11 @@ def get_data_at_point(
 
     point = result["point"]
     local_path = _state.cache.get(point["file_path"])
-    raw_df, file_meta, _ = load_parquet(local_path)
-    return prepare_dataframe(raw_df, file_meta)
+    raw_df, file_meta, var_meta = load_parquet(local_path)
+    df = prepare_dataframe(raw_df, file_meta)
+    if return_metadata:
+        return df, file_meta, var_meta
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +181,10 @@ from .analysis import (  # noqa: E402
 )
 from .viz._style import PLOT_CONFIG  # noqa: E402
 from .viz.tidal import (  # noqa: E402
+    DepthMode,
+    DepthPerspective,
     PlotSettings,
+    set_depth_perspective,
     analyze_power_density,
     create_tidal_resource_dashboard,
     generate_tidal_joint_probability,
@@ -202,7 +215,10 @@ from .viz.tidal import (  # noqa: E402
 
 __all__ = [
     "PLOT_CONFIG",
+    "DepthMode",
+    "DepthPerspective",
     "PlotSettings",
+    "set_depth_perspective",
     "SiteSummaryMetrics",
     "analyze_power_density",
     "calculate_tidal_levels",
