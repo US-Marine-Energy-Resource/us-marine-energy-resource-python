@@ -72,7 +72,7 @@ def _validate_columns(df: pd.DataFrame, columns: list[str]) -> None:
 
 
 def _calculate_tidal_statistics(
-    df: pd.DataFrame, layer: int, depth_mode: DepthMode = "depth_water_column_m"
+    df: pd.DataFrame, layer: int, depth_mode: DepthMode
 ) -> dict[str, Any]:
     """Calculate common tidal statistics for a single sigma layer.
 
