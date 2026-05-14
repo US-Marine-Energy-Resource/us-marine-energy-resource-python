@@ -28,3 +28,5 @@ jobs:
 
       - name: Render README
         run: quarto render README.qmd --to gfm
+        env:
+          QUARTO_PYTHON: .venv/bin/python
