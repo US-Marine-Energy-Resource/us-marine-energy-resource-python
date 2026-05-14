@@ -11,7 +11,7 @@ import seaborn as sns
 from matplotlib.figure import Figure
 
 from us_marine_energy_resource.viz._style import styled
-from us_marine_energy_resource.viz.settings import PlotSettings
+from us_marine_energy_resource.viz.settings import PlotSettings, get_depth_perspective
 
 from ._components import _N_LAYERS, _validate_columns
 
@@ -26,7 +26,6 @@ def plot_velocity_profile_with_histograms(
     min_layer_thickness: float = 0.1,
     min_total_depth: float = 1.0,
     show_filtered_stats: bool = True,
-    invert_depth_axis: bool = True,
     layout: str = "stacked",
     verbose: bool = False,
 ) -> tuple[Figure, dict[str, Any]]:
@@ -74,8 +73,6 @@ def plot_velocity_profile_with_histograms(
         Default 1.0.
     show_filtered_stats : bool, optional
         Annotate the figure with a data-quality summary. Default ``True``.
-    invert_depth_axis : bool, optional
-        Use oceanographic convention (surface at top). Default ``True``.
     layout : str, optional
         Panel arrangement. ``"stacked"`` (default) places the velocity profile
         and scatter plot in the top row and the three per-layer histogram groups
@@ -101,6 +98,7 @@ def plot_velocity_profile_with_histograms(
     ValueError
         If no data points remain after filtering.
     """
+    perspective = get_depth_perspective(settings)
     velocity_cols = [f"vap_sea_water_speed_layer_{i}" for i in range(_N_LAYERS)]
     direction_cols = [f"vap_sea_water_to_direction_layer_{i}" for i in range(_N_LAYERS)]
     depth_cols = [f"vap_sigma_depth_layer_{i}" for i in range(_N_LAYERS)]
