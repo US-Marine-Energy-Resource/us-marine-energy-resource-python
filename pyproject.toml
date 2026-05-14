@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "us-marine-energy-resource"
-version = "0.3.2"
+version = "0.4.0"
 description = "Download, visualize, and analyze the U.S. DOE Hydropower and Hydrokinetic Office (H2O) High Resolution Tidal Hindcast dataset"
 authors = [
   {name = "Andrew Simms", email = "andrew.simms@nlr.gov"},
