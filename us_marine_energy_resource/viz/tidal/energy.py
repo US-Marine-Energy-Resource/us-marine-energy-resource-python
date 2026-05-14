@@ -10,7 +10,7 @@ from matplotlib.figure import Figure
 
 from us_marine_energy_resource.analysis.resource import compute_power_density
 from us_marine_energy_resource.viz._style import styled
-from us_marine_energy_resource.viz.settings import PlotSettings
+from us_marine_energy_resource.viz.settings import PlotSettings, get_depth_perspective
 
 from ._components import _N_LAYERS, _validate_columns
 
@@ -62,9 +62,10 @@ def analyze_power_density(
     KeyError
         If required columns are absent from *df*.
     """
+    perspective = get_depth_perspective(settings)
     speed_cols = [f"vap_sea_water_speed_layer_{i}" for i in range(_N_LAYERS)]
     power_cols = [f"vap_sea_water_power_density_layer_{i}" for i in range(_N_LAYERS)]
-    depth_cols = [f"vap_sigma_depth_layer_{i}" for i in range(_N_LAYERS)]
+    depth_cols = [perspective.depth_col(i) for i in range(_N_LAYERS)]
     _validate_columns(df, speed_cols + power_cols + depth_cols)
 
     if layer is None:
@@ -74,7 +75,7 @@ def analyze_power_density(
         dtype=float, na_value=np.nan
     )
     power_densities: np.ndarray = compute_power_density(speeds, rho=rho)
-    depth = float(df[f"vap_sigma_depth_layer_{layer}"].iloc[0])
+    depth = float(df[perspective.depth_col(layer)].iloc[0])
 
     fig, axs = plt.subplots(2, 2, figsize=(14, 12))
 
