@@ -24,9 +24,7 @@ def parse_bbox(s: str) -> list[tuple[float, float]]:
     """
     parts = [p.strip() for p in s.split(",")]
     if len(parts) != 4:
-        raise ValueError(
-            f"--bbox expects 'lat_min,lon_min,lat_max,lon_max', got {s!r}"
-        )
+        raise ValueError(f"--bbox expects 'lat_min,lon_min,lat_max,lon_max', got {s!r}")
     lat_min, lon_min, lat_max, lon_max = (float(p) for p in parts)
     if lat_min >= lat_max:
         raise ValueError(f"lat_min ({lat_min}) must be less than lat_max ({lat_max})")

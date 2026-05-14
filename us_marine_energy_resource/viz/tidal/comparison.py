@@ -10,8 +10,9 @@ import pandas as pd
 from matplotlib.figure import Figure
 
 from us_marine_energy_resource.analysis.resource import SiteSummaryMetrics
+from us_marine_energy_resource.analysis.preprocessing import sigma_depth_scalar
 from us_marine_energy_resource.viz._style import styled
-from us_marine_energy_resource.viz.settings import PlotSettings
+from us_marine_energy_resource.viz.settings import PlotSettings, get_depth_perspective
 
 
 def _shorten_name(name: str) -> str:
@@ -188,12 +189,13 @@ def plot_jpd_comparison_grid(
         ax.set_visible(False)
 
     # Render each panel's scatter and collect (ax, scatter) pairs.
+    perspective = get_depth_perspective(settings)
     panel_data: list[tuple[Any, Any]] = []
     for (name, df, layer), ax in zip(site_records, axes_flat[:n], strict=True):
         to_direction = df[f"vap_sea_water_to_direction_layer_{layer}"]
         speed = df[f"vap_sea_water_speed_layer_{layer}"]
-        depth = df[f"vap_sigma_depth_layer_{layer}"]
-        depth_str = f"~{float(depth.mean()):.1f} m"
+        depth_m = sigma_depth_scalar(df, layer, perspective.mode)
+        depth_str = f"~{depth_m:.1f} m"
 
         ax, sx = _render_jpd_scatter(
             to_direction,

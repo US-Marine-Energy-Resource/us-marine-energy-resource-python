@@ -12,7 +12,7 @@ from matplotlib.gridspec import GridSpec
 from windrose import WindroseAxes  # type: ignore[import-untyped]
 
 from us_marine_energy_resource.viz._style import styled
-from us_marine_energy_resource.viz.settings import PlotSettings
+from us_marine_energy_resource.viz.settings import PlotSettings, get_depth_perspective
 
 from ._components import _N_LAYERS, _validate_columns
 
@@ -72,14 +72,15 @@ def create_tidal_resource_dashboard(
     KeyError
         If core per-layer columns are absent from *df*.
     """
+    perspective = get_depth_perspective(settings)
     speed_cols = [f"vap_sea_water_speed_layer_{i}" for i in range(_N_LAYERS)]
     power_cols = [f"vap_sea_water_power_density_layer_{i}" for i in range(_N_LAYERS)]
-    depth_cols = [f"vap_sigma_depth_layer_{i}" for i in range(_N_LAYERS)]
+    depth_cols = [perspective.depth_col(i) for i in range(_N_LAYERS)]
     dir_cols = [f"vap_sea_water_to_direction_layer_{i}" for i in range(_N_LAYERS)]
     _validate_columns(df, speed_cols + power_cols + depth_cols + dir_cols + ["vap_sea_floor_depth"])
 
     data = df.iloc[timestamp_index]
-    depths = [float(data[f"vap_sigma_depth_layer_{i}"]) for i in range(_N_LAYERS)]
+    depths = [float(data[perspective.depth_col(i)]) for i in range(_N_LAYERS)]
     speeds_ts = [float(data[f"vap_sea_water_speed_layer_{i}"]) for i in range(_N_LAYERS)]
     power_ts = [float(data[f"vap_sea_water_power_density_layer_{i}"]) for i in range(_N_LAYERS)]
 
@@ -257,6 +258,7 @@ def generate_tidal_site_assessment(
     KeyError
         If required columns are absent from *df*.
     """
+    perspective = get_depth_perspective(settings)
     required_wc = [
         "vap_water_column_mean_sea_water_speed",
         "vap_water_column_max_sea_water_speed",
@@ -268,7 +270,7 @@ def generate_tidal_site_assessment(
         "lat_center",
         "lon_center",
     ]
-    depth_cols = [f"vap_sigma_depth_layer_{i}" for i in range(_N_LAYERS)]
+    depth_cols = [perspective.depth_col(i) for i in range(_N_LAYERS)]
     speed_layer_cols = [f"vap_sea_water_speed_layer_{i}" for i in range(_N_LAYERS)]
     _validate_columns(df, required_wc + depth_cols + speed_layer_cols)
 
@@ -389,7 +391,7 @@ def generate_tidal_site_assessment(
     # 6 — vertical profile
     ax_prof: Any = fig.add_subplot(gs_fig[2, 2])
     mean_speeds = [float(df[f"vap_sea_water_speed_layer_{i}"].mean()) for i in range(_N_LAYERS)]
-    mean_depths = [float(df[f"vap_sigma_depth_layer_{i}"].mean()) for i in range(_N_LAYERS)]
+    mean_depths = [float(df[perspective.depth_col(i)].mean()) for i in range(_N_LAYERS)]
     ax_prof.plot(mean_speeds, mean_depths, "o-", linewidth=2, markersize=8)
     opt = int(np.argmax(mean_speeds))
     ax_prof.annotate(

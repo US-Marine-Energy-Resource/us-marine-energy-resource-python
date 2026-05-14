@@ -11,7 +11,7 @@ import seaborn as sns
 from matplotlib.figure import Figure
 
 from us_marine_energy_resource.viz._style import styled
-from us_marine_energy_resource.viz.settings import PlotSettings
+from us_marine_energy_resource.viz.settings import PlotSettings, get_depth_perspective
 
 from ._components import _N_LAYERS, _validate_columns
 
@@ -26,7 +26,6 @@ def plot_velocity_profile_with_histograms(
     min_layer_thickness: float = 0.1,
     min_total_depth: float = 1.0,
     show_filtered_stats: bool = True,
-    invert_depth_axis: bool = True,
     layout: str = "stacked",
     verbose: bool = False,
 ) -> tuple[Figure, dict[str, Any]]:
@@ -74,8 +73,6 @@ def plot_velocity_profile_with_histograms(
         Default 1.0.
     show_filtered_stats : bool, optional
         Annotate the figure with a data-quality summary. Default ``True``.
-    invert_depth_axis : bool, optional
-        Use oceanographic convention (surface at top). Default ``True``.
     layout : str, optional
         Panel arrangement. ``"stacked"`` (default) places the velocity profile
         and scatter plot in the top row and the three per-layer histogram groups
@@ -101,9 +98,10 @@ def plot_velocity_profile_with_histograms(
     ValueError
         If no data points remain after filtering.
     """
+    perspective = get_depth_perspective(settings)
     velocity_cols = [f"vap_sea_water_speed_layer_{i}" for i in range(_N_LAYERS)]
     direction_cols = [f"vap_sea_water_to_direction_layer_{i}" for i in range(_N_LAYERS)]
-    depth_cols = [f"vap_sigma_depth_layer_{i}" for i in range(_N_LAYERS)]
+    depth_cols = [perspective.depth_col(i) for i in range(_N_LAYERS)]
     _validate_columns(df, velocity_cols + direction_cols + depth_cols)
 
     stats: dict[str, Any] = {
@@ -269,7 +267,7 @@ def plot_velocity_profile_with_histograms(
     ax_profile.plot([], [], "-", color=median_color, linewidth=1.5, label="Median")
     ax_profile.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=2)
     ax_profile.set_xlabel("Sea Water Speed [m/s]")
-    ax_profile.set_ylabel("Depth [m]")
+    ax_profile.set_ylabel(perspective.depth_label())
 
     title = "Velocity Profile"
     if show_filtered_stats:
@@ -285,7 +283,7 @@ def plot_velocity_profile_with_histograms(
         ax_profile.set_yticks(y_ticks)
         ax_profile.set_yticklabels(y_labels)
 
-    if invert_depth_axis:
+    if perspective.should_invert_axis():
         ax_profile.invert_yaxis()
     ax_profile.grid(True)
 
@@ -368,10 +366,10 @@ def plot_velocity_profile_with_histograms(
         )
 
     ax_scatter.set_xlabel("Sea Water Speed [m/s]")
-    ax_scatter.set_ylabel("Depth [m]")
+    ax_scatter.set_ylabel(perspective.depth_label())
     ax_scatter.set_title("Depth vs. Speed")
     ax_scatter.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=2)
-    if invert_depth_axis:
+    if perspective.should_invert_axis():
         ax_scatter.invert_yaxis()
     ax_scatter.grid(True, linestyle="--", alpha=0.7)
 
@@ -476,7 +474,7 @@ def plot_velocity_profile_with_histograms(
         else:
             ax_v.set_xlabel("Sea Water Speed [m/s]")
             ax_d.set_xlabel("Direction [°]")
-            ax_p.set_xlabel("Depth [m]")
+            ax_p.set_xlabel(perspective.depth_label())
 
         ax_v.set_xlim(vel_edges[0], vel_edges[-1])
         ax_d.set_xlim(0, 360)
@@ -542,21 +540,23 @@ def plot_velocity_profile(
     KeyError
         If required columns are absent from *df*.
     """
+    perspective = get_depth_perspective(settings)
     _validate_columns(
         df,
         [f"vap_sea_water_speed_layer_{i}" for i in range(_N_LAYERS)]
-        + [f"vap_sigma_depth_layer_{i}" for i in range(_N_LAYERS)],
+        + [perspective.depth_col(i) for i in range(_N_LAYERS)],
     )
     fig, ax = plt.subplots(figsize=(10, 8))
-    depths = [float(df.iloc[timestamp_idx][f"vap_sigma_depth_layer_{i}"]) for i in range(_N_LAYERS)]
+    depths = [float(df.iloc[timestamp_idx][perspective.depth_col(i)]) for i in range(_N_LAYERS)]
     velocities = [
         float(df.iloc[timestamp_idx][f"vap_sea_water_speed_layer_{i}"]) for i in range(_N_LAYERS)
     ]
     ax.plot(velocities, depths, "o-", linewidth=2, markersize=8)
     ax.set_xlabel("Sea Water Speed [m/s]")
-    ax.set_ylabel("Depth [m]")
+    ax.set_ylabel(perspective.depth_label())
     ax.set_title(f"Velocity Profile at {df.index[timestamp_idx]}")
-    ax.invert_yaxis()
+    if perspective.should_invert_axis():
+        ax.invert_yaxis()
     ax.grid(True, linestyle="--", alpha=0.7)
     plt.tight_layout()
     return fig
@@ -591,14 +591,15 @@ def plot_tidal_velocity_profile(
     KeyError
         If required columns are absent from *df*.
     """
+    perspective = get_depth_perspective(settings)
     _validate_columns(
         df,
         [f"vap_sea_water_speed_layer_{i}" for i in range(_N_LAYERS)]
         + [f"vap_sea_water_to_direction_layer_{i}" for i in range(_N_LAYERS)]
-        + [f"vap_sigma_depth_layer_{i}" for i in range(_N_LAYERS)],
+        + [perspective.depth_col(i) for i in range(_N_LAYERS)],
     )
     data = df.iloc[timestamp_index]
-    depths = [float(data[f"vap_sigma_depth_layer_{i}"]) for i in range(_N_LAYERS)]
+    depths = [float(data[perspective.depth_col(i)]) for i in range(_N_LAYERS)]
     speeds = [float(data[f"vap_sea_water_speed_layer_{i}"]) for i in range(_N_LAYERS)]
     directions = [float(data[f"vap_sea_water_to_direction_layer_{i}"]) for i in range(_N_LAYERS)]
 
@@ -606,17 +607,19 @@ def plot_tidal_velocity_profile(
 
     ax1.plot(speeds, depths, "o-", linewidth=2, markersize=8)
     ax1.set_xlabel("Current Speed [m/s]")
-    ax1.set_ylabel("Depth [m]")
+    ax1.set_ylabel(perspective.depth_label())
     ax1.set_title("Velocity Profile")
     ax1.grid(True)
-    ax1.invert_yaxis()
+    if perspective.should_invert_axis():
+        ax1.invert_yaxis()
 
     ax2.plot(directions, depths, "o-", linewidth=2, markersize=8, color=sns.color_palette()[1])
     ax2.set_xlabel("Current Direction [degrees]")
-    ax2.set_ylabel("Depth [m]")
+    ax2.set_ylabel(perspective.depth_label())
     ax2.set_title("Direction Profile")
     ax2.grid(True)
-    ax2.invert_yaxis()
+    if perspective.should_invert_axis():
+        ax2.invert_yaxis()
     ax2.set_xlim(0, 360)
 
     plt.suptitle(f"Profiles at {df.index[timestamp_index]}")
@@ -653,14 +656,15 @@ def plot_power_density_profile(
     KeyError
         If required columns are absent from *df*.
     """
+    perspective = get_depth_perspective(settings)
     _validate_columns(
         df,
         [f"vap_sea_water_power_density_layer_{i}" for i in range(_N_LAYERS)]
         + [f"vap_sea_water_speed_layer_{i}" for i in range(_N_LAYERS)]
-        + [f"vap_sigma_depth_layer_{i}" for i in range(_N_LAYERS)],
+        + [perspective.depth_col(i) for i in range(_N_LAYERS)],
     )
     data = df.iloc[timestamp_index]
-    depths = [float(data[f"vap_sigma_depth_layer_{i}"]) for i in range(_N_LAYERS)]
+    depths = [float(data[perspective.depth_col(i)]) for i in range(_N_LAYERS)]
     power = [float(data[f"vap_sea_water_power_density_layer_{i}"]) for i in range(_N_LAYERS)]
     speeds = [float(data[f"vap_sea_water_speed_layer_{i}"]) for i in range(_N_LAYERS)]
 
@@ -677,10 +681,11 @@ def plot_power_density_profile(
         label="Power Density",
     )
     ax.set_xlabel("Power Density [W/m^2]")
-    ax.set_ylabel("Depth [m]")
+    ax.set_ylabel(perspective.depth_label())
     ax.set_title("Tidal Power Density Profile")
     ax.grid(True)
-    ax.invert_yaxis()
+    if perspective.should_invert_axis():
+        ax.invert_yaxis()
 
     ax2.plot(
         speeds,
@@ -727,21 +732,22 @@ def plot_velocity_shear_profile(df: pd.DataFrame, settings: PlotSettings | None 
     KeyError
         If required columns are absent from *df*.
     """
+    perspective = get_depth_perspective(settings)
     _validate_columns(
         df,
         [f"vap_sea_water_speed_layer_{i}" for i in range(_N_LAYERS)]
-        + [f"vap_sigma_depth_layer_{i}" for i in range(_N_LAYERS)],
+        + [perspective.depth_col(i) for i in range(_N_LAYERS)],
     )
 
-    depths = [float(df[f"vap_sigma_depth_layer_{i}"].mean()) for i in range(_N_LAYERS)]
+    depths = [float(df[perspective.depth_col(i)].mean()) for i in range(_N_LAYERS)]
 
     velocity_diffs: list[np.ndarray] = []
     depth_diffs: list[np.ndarray] = []
     for i in range(_N_LAYERS - 1):
         v1 = df[f"vap_sea_water_speed_layer_{i}"].to_numpy(dtype=float)
         v2 = df[f"vap_sea_water_speed_layer_{i + 1}"].to_numpy(dtype=float)
-        d1 = df[f"vap_sigma_depth_layer_{i}"].to_numpy(dtype=float)
-        d2 = df[f"vap_sigma_depth_layer_{i + 1}"].to_numpy(dtype=float)
+        d1 = df[perspective.depth_col(i)].to_numpy(dtype=float)
+        d2 = df[perspective.depth_col(i + 1)].to_numpy(dtype=float)
         velocity_diffs.append(v1 - v2)
         depth_diffs.append(d2 - d1)
 
@@ -753,10 +759,11 @@ def plot_velocity_shear_profile(df: pd.DataFrame, settings: PlotSettings | None 
     mean_vel = [float(df[f"vap_sea_water_speed_layer_{i}"].mean()) for i in range(_N_LAYERS)]
     ax1.plot(mean_vel, depths, "o-", linewidth=2, markersize=8)
     ax1.set_xlabel("Mean Current Speed [m/s]")
-    ax1.set_ylabel("Depth [m]")
+    ax1.set_ylabel(perspective.depth_label())
     ax1.set_title("Vertical Velocity Profile")
     ax1.grid(True)
-    ax1.invert_yaxis()
+    if perspective.should_invert_axis():
+        ax1.invert_yaxis()
 
     mean_shear = [float(np.mean(s)) for s in shear]
     std_shear = [float(np.std(s)) for s in shear]
@@ -773,10 +780,11 @@ def plot_velocity_shear_profile(df: pd.DataFrame, settings: PlotSettings | None 
         capsize=5,
     )
     ax2.set_xlabel("Velocity Shear [1/s]")
-    ax2.set_ylabel("Depth [m]")
+    ax2.set_ylabel(perspective.depth_label())
     ax2.set_title("Vertical Shear Profile")
     ax2.grid(True)
-    ax2.invert_yaxis()
+    if perspective.should_invert_axis():
+        ax2.invert_yaxis()
 
     bp = ax3.boxplot(shear, positions=iface_depths, vert=False, patch_artist=True, widths=0.5)
     for box in bp["boxes"]:
@@ -784,10 +792,11 @@ def plot_velocity_shear_profile(df: pd.DataFrame, settings: PlotSettings | None 
     for median in bp["medians"]:
         median.set(color=sns.color_palette()[1], linewidth=2)
     ax3.set_xlabel("Velocity Shear [1/s]")
-    ax3.set_ylabel("Depth [m]")
+    ax3.set_ylabel(perspective.depth_label())
     ax3.set_title("Shear Variability")
     ax3.grid(True, axis="x")
-    ax3.invert_yaxis()
+    if perspective.should_invert_axis():
+        ax3.invert_yaxis()
 
     total_depth = depths[-1] - depths[0]
     surf_speed = float(df["vap_sea_water_speed_layer_0"].mean())

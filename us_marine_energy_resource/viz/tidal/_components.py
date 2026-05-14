@@ -27,7 +27,7 @@ _N_LAYERS = 10
 _COMPLEX_TOLERANCE = 1e-10
 
 
-def _validate_dataframe(df: pd.DataFrame, depth_mode: DepthMode = "depth_water_column_m") -> None:
+def _validate_dataframe(df: pd.DataFrame, depth_mode: DepthMode) -> None:
     """Validate that DataFrame contains expected columns for the requested depth mode.
 
     Parameters
@@ -72,7 +72,7 @@ def _validate_columns(df: pd.DataFrame, columns: list[str]) -> None:
 
 
 def _calculate_tidal_statistics(
-    df: pd.DataFrame, layer: int, depth_mode: DepthMode = "depth_water_column_m"
+    df: pd.DataFrame, layer: int, depth_mode: DepthMode
 ) -> dict[str, Any]:
     """Calculate common tidal statistics for a single sigma layer.
 

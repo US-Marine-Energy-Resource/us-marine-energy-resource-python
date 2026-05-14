@@ -69,9 +69,7 @@ def test_all_regions_return_valid_dataframes(all_site_dfs: dict[str, pd.DataFram
             pd.Timedelta(minutes=30) if name in _HALF_HOURLY_REGIONS else pd.Timedelta(hours=1)
         )
         actual_dt = df.index.to_series().diff().dropna().median()
-        assert actual_dt == expected_dt, (
-            f"{name}: expected {expected_dt} timestep; got {actual_dt}"
-        )
+        assert actual_dt == expected_dt, f"{name}: expected {expected_dt} timestep; got {actual_dt}"
 
 
 @pytest.mark.integration

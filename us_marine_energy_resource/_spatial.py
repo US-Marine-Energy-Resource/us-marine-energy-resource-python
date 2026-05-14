@@ -128,18 +128,9 @@ _ERROR_CLASSES: dict[str, type[OutsideDomainError]] = {
 }
 
 _ERROR_MESSAGES: dict[str, str] = {
-    "point": (
-        "Coordinate ({lat:.5f}, {lon:.5f}) is not inside any dataset domain.\n"
-        "{domains}"
-    ),
-    "area": (
-        "Query polygon does not intersect any dataset domain.\n"
-        "{domains}"
-    ),
-    "line": (
-        "Query transect does not pass through any dataset domain.\n"
-        "{domains}"
-    ),
+    "point": ("Coordinate ({lat:.5f}, {lon:.5f}) is not inside any dataset domain.\n{domains}"),
+    "area": ("Query polygon does not intersect any dataset domain.\n{domains}"),
+    "line": ("Query transect does not pass through any dataset domain.\n{domains}"),
 }
 
 
@@ -172,6 +163,7 @@ def _polygon_wkt(coords: Sequence[tuple[float, float]]) -> str:
 def _polygon_wkt_360(coords: Sequence[tuple[float, float]]) -> str:
     def _lon360(lon: float) -> float:
         return lon + 360.0 if lon < 0.0 else lon
+
     pts = [f"{_lon360(lon)} {lat}" for lat, lon in coords]
     if pts[0] != pts[-1]:
         pts.append(pts[0])
@@ -186,6 +178,7 @@ def _line_wkt(coords: Sequence[tuple[float, float]]) -> str:
 def _line_wkt_360(coords: Sequence[tuple[float, float]]) -> str:
     def _lon360(lon: float) -> float:
         return lon + 360.0 if lon < 0.0 else lon
+
     pts = [f"{_lon360(lon)} {lat}" for lat, lon in coords]
     return f"LINESTRING({', '.join(pts)})"
 
@@ -209,7 +202,7 @@ ST_MakePolygon(ST_MakeLine(ARRAY[
 
 # Coordinate precision: decimal places stored in parquet centroid columns (≈ 1 cm ground resolution).
 _COORD_DECIMAL_PRECISION: int = 7
-_COORD_PRECISION_SCALE: int = 10 ** _COORD_DECIMAL_PRECISION
+_COORD_PRECISION_SCALE: int = 10**_COORD_DECIMAL_PRECISION
 
 # Bounding-box pre-filter margin: 0.1° in the same integer coordinate space ≈ 11 km at equator.
 _CENTROID_BBOX_MARGIN: int = _COORD_PRECISION_SCALE // 10
@@ -224,10 +217,7 @@ def _face_distance_km_expr(lat: float, lon: float) -> str:
     """
     query_pt = f"ST_Point({lon}::DOUBLE, {lat}::DOUBLE)"
     return (
-        f"ST_Distance_Sphere("
-        f"    ST_ClosestPoint({_TRIANGLE}, {query_pt}),"
-        f"    {query_pt}"
-        f") / 1000.0"
+        f"ST_Distance_Sphere(    ST_ClosestPoint({_TRIANGLE}, {query_pt}),    {query_pt}) / 1000.0"
     )
 
 
@@ -245,8 +235,7 @@ def _domain_summary(con: duckdb.DuckDBPyConnection) -> str:
     lines = ["Available domains:"]
     for loc, lat_min, lat_max, lon_min, lon_max in rows:
         lines.append(
-            f"  {loc}: lat [{lat_min:.3f}, {lat_max:.3f}]  "
-            f"lon [{lon_min:.3f}, {lon_max:.3f}]"
+            f"  {loc}: lat [{lat_min:.3f}, {lat_max:.3f}]  lon [{lon_min:.3f}, {lon_max:.3f}]"
         )
     return "\n".join(lines)
 
@@ -319,9 +308,7 @@ def _bbox_clause(
     )
 
 
-def _envelope_bbox_clause(
-    lat_min: float, lat_max: float, lon_min: float, lon_max: float
-) -> str:
+def _envelope_bbox_clause(lat_min: float, lat_max: float, lon_min: float, lon_max: float) -> str:
     margin = _CENTROID_BBOX_MARGIN
     lat_min_fp = int(lat_min * _COORD_PRECISION_SCALE) - margin
     lat_max_fp = int(lat_max * _COORD_PRECISION_SCALE) + margin
@@ -428,9 +415,7 @@ def find_faces_area(
     query_wkt = _polygon_wkt(coords)
     query_wkt_360 = _polygon_wkt_360(coords)
 
-    matched_locs = _resolve_locations(
-        con, query_wkt, query_wkt_360, "area", location
-    )
+    matched_locs = _resolve_locations(con, query_wkt, query_wkt_360, "area", location)
 
     bbox = _envelope_bbox_clause(min(lats), max(lats), min(lons), max(lons))
     area_geom = f"ST_GeomFromText('{query_wkt}')"
@@ -496,9 +481,7 @@ def find_faces_line(
     query_wkt = _line_wkt(coords)
     query_wkt_360 = _line_wkt_360(coords)
 
-    matched_locs = _resolve_locations(
-        con, query_wkt, query_wkt_360, "line", location
-    )
+    matched_locs = _resolve_locations(con, query_wkt, query_wkt_360, "line", location)
 
     bbox = _envelope_bbox_clause(min(lats), max(lats), min(lons), max(lons))
     line_geom = f"ST_GeomFromText('{query_wkt}')"

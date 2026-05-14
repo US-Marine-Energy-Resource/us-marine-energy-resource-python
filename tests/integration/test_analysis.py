@@ -103,10 +103,10 @@ def test_select_layer_for_depth_returns_valid_layers(cook_inlet_df: pd.DataFrame
 
     for depth_m in (5.0, 10.0, 20.0):
         layer, actual_depth = select_layer_for_depth(df, depth_m, relative_to="surface")
-        assert 0 <= layer <= 9, (
-            f"depth={depth_m} m from surface: layer index {layer} out of [0, 9]"
+        assert 0 <= layer <= 9, f"depth={depth_m} m from surface: layer index {layer} out of [0, 9]"
+        assert actual_depth > 0, (
+            f"depth={depth_m} m from surface: returned depth {actual_depth} <= 0"
         )
-        assert actual_depth > 0, f"depth={depth_m} m from surface: returned depth {actual_depth} <= 0"
 
         layer_sf, actual_depth_sf = select_layer_for_depth(df, depth_m, relative_to="sea_floor")
         assert 0 <= layer_sf <= 9, (

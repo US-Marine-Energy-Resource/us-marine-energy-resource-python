@@ -1,6 +1,7 @@
 """Tidal visualization submodule."""
 
-from ..settings import PlotSettings
+from ..settings import DepthPerspective, PlotSettings, set_depth_perspective
+from ...analysis.preprocessing import DepthMode
 from .comparison import (
     plot_jpd_comparison_grid,
     plot_multi_site_comparison,
@@ -33,7 +34,10 @@ from .time_series import (
 )
 
 __all__ = [
+    "DepthMode",
+    "DepthPerspective",
     "PlotSettings",
+    "set_depth_perspective",
     "analyze_power_density",
     "create_tidal_resource_dashboard",
     "generate_tidal_joint_probability",

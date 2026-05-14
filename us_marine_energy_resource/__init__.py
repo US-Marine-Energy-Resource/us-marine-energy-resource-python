@@ -32,12 +32,10 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from . import tidal_hindcast
-    from .analysis.preprocessing import DepthMode
     from .cache import S3CacheManager
     from .manifest import TidalManifestQuery, find_latest_manifest_hpc, find_latest_manifest_s3
 
 __all__ = [
-    "DepthMode",
     "S3CacheManager",
     "TidalManifestQuery",
     "find_latest_manifest_hpc",
@@ -50,11 +48,10 @@ _SUBMODULES = {"tidal_hindcast"}
 
 # Symbols that live inside a submodule — (submodule_path, attr_name).
 _SYMBOLS: dict[str, tuple[str, str]] = {
-    "DepthMode":                  (".analysis.preprocessing", "DepthMode"),
-    "S3CacheManager":             (".cache",                  "S3CacheManager"),
-    "TidalManifestQuery":         (".manifest",               "TidalManifestQuery"),
-    "find_latest_manifest_hpc":   (".manifest",               "find_latest_manifest_hpc"),
-    "find_latest_manifest_s3":    (".manifest",               "find_latest_manifest_s3"),
+    "S3CacheManager": (".cache", "S3CacheManager"),
+    "TidalManifestQuery": (".manifest", "TidalManifestQuery"),
+    "find_latest_manifest_hpc": (".manifest", "find_latest_manifest_hpc"),
+    "find_latest_manifest_s3": (".manifest", "find_latest_manifest_s3"),
 }
 
 

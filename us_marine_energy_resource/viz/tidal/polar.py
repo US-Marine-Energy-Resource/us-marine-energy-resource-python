@@ -9,7 +9,7 @@ from matplotlib.figure import Figure
 from windrose import WindroseAxes  # type: ignore[import-untyped]
 
 from us_marine_energy_resource.viz._style import styled
-from us_marine_energy_resource.viz.settings import PlotSettings
+from us_marine_energy_resource.viz.settings import PlotSettings, get_depth_perspective
 
 from ._components import _validate_columns
 
@@ -50,12 +50,13 @@ def plot_current_rose(
     KeyError
         If required columns are absent from *df*.
     """
+    perspective = get_depth_perspective(settings)
     _validate_columns(
         df,
         [
             f"vap_sea_water_speed_layer_{layer}",
             f"vap_sea_water_to_direction_layer_{layer}",
-            f"vap_sigma_depth_layer_{layer}",
+            perspective.depth_col(layer),
         ],
     )
 
@@ -65,7 +66,7 @@ def plot_current_rose(
     directions: np.ndarray = df[f"vap_sea_water_to_direction_layer_{layer}"].to_numpy(
         dtype=float, na_value=np.nan
     )
-    depth = float(df[f"vap_sigma_depth_layer_{layer}"].iloc[0])
+    depth = float(df[perspective.depth_col(layer)].iloc[0])
 
     directions_rad = np.deg2rad(directions)
     bin_width = 2 * np.pi / bins
@@ -108,7 +109,7 @@ def plot_current_rose(
     ax.set_theta_direction(-1)
     ax.set_xticks(np.deg2rad([0, 45, 90, 135, 180, 225, 270, 315]))
     ax.set_xticklabels(["N", "NE", "E", "SE", "S", "SW", "W", "NW"])
-    plt.title(f"Current Rose at {depth:.1f} m Depth (Layer {layer})")
+    plt.title(f"Current Rose at {depth:.1f} m ({perspective.depth_label()}) - Layer {layer}")
     plt.legend(loc="lower right", bbox_to_anchor=(1.1, -0.1))
     return fig
 
@@ -142,12 +143,13 @@ def plot_tidal_rose(
     KeyError
         If required columns are absent from *df*.
     """
+    perspective = get_depth_perspective(settings)
     _validate_columns(
         df,
         [
             f"vap_sea_water_speed_layer_{layer}",
             f"vap_sea_water_to_direction_layer_{layer}",
-            f"vap_sigma_depth_layer_{layer}",
+            perspective.depth_col(layer),
         ],
     )
 
@@ -157,7 +159,7 @@ def plot_tidal_rose(
     directions: np.ndarray = df[f"vap_sea_water_to_direction_layer_{layer}"].to_numpy(
         dtype=float, na_value=np.nan
     )
-    depth = float(df[f"vap_sigma_depth_layer_{layer}"].mean())
+    depth = float(df[perspective.depth_col(layer)].mean())
 
     fig = plt.figure(figsize=(10, 10))
     rect = [0.1, 0.1, 0.8, 0.8]
@@ -173,5 +175,5 @@ def plot_tidal_rose(
         cmap=plt.cm.viridis,  # type: ignore[attr-defined]
     )
     ax.set_legend(title="Speed [m/s]")
-    ax.set_title(f"Tidal Current Rose at {depth:.1f} m Depth")
+    ax.set_title(f"Tidal Current Rose at {depth:.1f} m ({perspective.depth_label()})")
     return fig
