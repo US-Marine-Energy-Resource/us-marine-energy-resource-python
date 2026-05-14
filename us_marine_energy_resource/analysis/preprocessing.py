@@ -1,7 +1,8 @@
 """Data loading and preprocessing for tidal energy parquet files."""
 
+import enum
 from pathlib import Path
-from typing import Any, Literal, TypedDict
+from typing import Any, TypedDict
 
 import numpy as np
 import pandas as pd
@@ -10,29 +11,34 @@ import pyarrow.parquet as pq
 
 _N_LAYERS = 10
 
-DepthMode = Literal["depth_water_column_m", "height_water_column_m", "depth_from_navd88_m", "height_to_navd88_m"]
-"""Depth coordinate convention for sigma-layer data.
+class DepthMode(enum.Enum):
+    """Depth coordinate convention for sigma-layer data.
 
-``"depth_water_column_m"``
-    Depth below the instantaneous sea surface in metres (σ × D).
-    ``D = vap_sea_floor_depth`` is the instantaneous total water column depth.
-    Stored in ``vap_sigma_depth_layer_{i}`` columns.
+    ``FixedSurface``
+        Depth below the instantaneous sea surface in metres (σ × D).
+        ``D = vap_sea_floor_depth`` is the instantaneous total water column depth.
+        Stored in ``vap_sigma_depth_layer_{i}`` columns.
 
-``"height_water_column_m"``
-    Height above the instantaneous seafloor in metres ((1 − σ) × D).
-    Stored in ``vap_sigma_height_layer_{i}`` columns.
+    ``FixedBottom``
+        Height above the instantaneous seafloor in metres ((1 − σ) × D).
+        Stored in ``vap_sigma_height_layer_{i}`` columns.
 
-``"depth_from_navd88_m"``
-    Depth below NAVD88 datum in metres (σ × D − ζ), where ζ is
-    ``vap_surface_elevation`` (tidal surface elevation relative to NAVD88).
-    Stored in ``vap_sigma_depth_navd88_layer_{i}`` columns.
-    Requires ``vap_surface_elevation`` in the DataFrame.
+    ``Navd88Depth``
+        Depth below NAVD88 datum in metres (σ × D − ζ), where ζ is
+        ``vap_surface_elevation`` (tidal surface elevation relative to NAVD88).
+        Stored in ``vap_sigma_depth_navd88_layer_{i}`` columns.
+        Requires ``vap_surface_elevation`` in the DataFrame.
 
-``"height_to_navd88_m"``
-    Height above NAVD88 datum in metres (ζ − σ × D).
-    Stored in ``vap_sigma_height_navd88_layer_{i}`` columns.
-    Requires ``vap_surface_elevation`` in the DataFrame.
-"""
+    ``Navd88Elevation``
+        Height above NAVD88 datum in metres (ζ − σ × D).
+        Stored in ``vap_sigma_height_navd88_layer_{i}`` columns.
+        Requires ``vap_surface_elevation`` in the DataFrame.
+    """
+
+    FixedSurface = enum.auto()
+    FixedBottom = enum.auto()
+    Navd88Depth = enum.auto()
+    Navd88Elevation = enum.auto()
 
 
 def sigma_layer_depth_col(layer: int, mode: DepthMode) -> str:
@@ -50,13 +56,15 @@ def sigma_layer_depth_col(layer: int, mode: DepthMode) -> str:
     str
         Column name present after :func:`prepare_dataframe` has been called.
     """
-    if mode == "depth_water_column_m":
-        return f"vap_sigma_depth_layer_{layer}"
-    if mode == "height_water_column_m":
-        return f"vap_sigma_height_layer_{layer}"
-    if mode == "depth_from_navd88_m":
-        return f"vap_sigma_depth_navd88_layer_{layer}"
-    return f"vap_sigma_height_navd88_layer_{layer}"
+    match mode:
+        case DepthMode.FixedSurface:
+            return f"vap_sigma_depth_layer_{layer}"
+        case DepthMode.FixedBottom:
+            return f"vap_sigma_height_layer_{layer}"
+        case DepthMode.Navd88Depth:
+            return f"vap_sigma_depth_navd88_layer_{layer}"
+        case DepthMode.Navd88Elevation:
+            return f"vap_sigma_height_navd88_layer_{layer}"
 
 
 def sigma_depth_scalar(df: pd.DataFrame, layer: int, mode: DepthMode) -> float:
@@ -113,13 +121,15 @@ def sigma_depth_axis_label(mode: DepthMode) -> str:
     str
         Human-readable axis label.
     """
-    if mode == "depth_water_column_m":
-        return "Depth Below Sea Surface [m]"
-    if mode == "height_water_column_m":
-        return "Height Above Seafloor [m]"
-    if mode == "depth_from_navd88_m":
-        return "Depth Below NAVD88 [m]"
-    return "Height Above NAVD88 [m]"
+    match mode:
+        case DepthMode.FixedSurface:
+            return "Depth [m from surface]"
+        case DepthMode.FixedBottom:
+            return "Altitude [m from seafloor]"
+        case DepthMode.Navd88Depth:
+            return "Depth [m from NAVD88]"
+        case DepthMode.Navd88Elevation:
+            return "Altitude [m from NAVD88]"
 
 
 def prepare_dataframe(
