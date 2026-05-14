@@ -86,6 +86,30 @@ location_name = "Cook Inlet, Near Nikiski, AK"
 df = tidal.get_data_at_point(lat=lat, lon=lon)
 ```
 
+```{python}
+_LOCAL = "docs/images"
+
+def img(filename: str) -> str:
+    return f"{_LOCAL}/{filename}"
+```
+
+```{python}
+#| include: false
+_REMOTE = "https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images"
+_last_img: str = ""
+
+class _Img(str):
+    def __new__(cls, filename: str) -> "_Img":
+        global _last_img
+        obj = super().__new__(cls, f"{_LOCAL}/{filename}")
+        obj.url = f"{_REMOTE}/{filename}"  # type: ignore[attr-defined]
+        _last_img = obj
+        return obj
+
+def img(filename: str) -> "_Img":
+    return _Img(filename)
+```
+
 `us_marine_energy_resource` has functions to plot the point data at the 10 uniform depths over time.
 The underlying data contains speed [m/s] and direction [deg cw from True North] calculated from the
 underlying model `u` and `v` variables at each sigma layer at each time step. To convert this to a
@@ -108,24 +132,32 @@ settings=PlotSettings(
     fig_width=9,
     fig_height=2.5,
     caption=f"Latitude: {lat}, Longitude: {lon}",
-    save_path="docs/images/quickstart-sigma-speed-year.png",
+    save_path=img("quickstart-sigma-speed-year.png"),
 )
 
 tidal.plot_sigma_layers_speed(df, settings=settings)
 ```
 
-![Full year current speed across sigma layers, Cook Inlet near Nikiski, AK](docs/images/quickstart-sigma-speed-year.png)
+```{python}
+#| echo: false
+#| output: asis
+print(f"![Full year current speed across sigma layers, Cook Inlet near Nikiski, AK]({_last_img.url})")
+```
 
 Additionally we can plot direction [deg clockwise from true north] at all depths over time.
 
 ```{python}
 settings.title = settings.title.replace("Current Speed", "Direction [deg cw from True North]")
-settings.save_path = "docs/images/quickstart-sigma-direction-year.png"
+settings.save_path = img("quickstart-sigma-direction-year.png")
 
 tidal.plot_sigma_layers_direction(df, settings=settings)
 ```
 
-![Full year direction across sigma layers, Cook Inlet near Nikiski, AK](docs/images/quickstart-sigma-direction-year.png)
+```{python}
+#| echo: false
+#| output: asis
+print(f"![Full year direction across sigma layers, Cook Inlet near Nikiski, AK]({_last_img.url})")
+```
 
 It is also possible to zoom into specific start dates within the model run. The simplest way to do
 this is to create time objects from the data and use variables to control the offset from the start
@@ -144,22 +176,30 @@ settings = PlotSettings(
     fig_width=8,
     fig_height=3,
     caption=f"Latitude: {lat}, Longitude: {lon}",
-    save_path="docs/images/quickstart-sigma-speed-3day.png",
+    save_path=img("quickstart-sigma-speed-3day.png"),
 )
 
 tidal.plot_sigma_layers_speed(df, settings=settings)
 ```
 
-![3-day current speed across sigma layers, Cook Inlet near Nikiski, AK](docs/images/quickstart-sigma-speed-3day.png)
+```{python}
+#| echo: false
+#| output: asis
+print(f"![3-day current speed across sigma layers, Cook Inlet near Nikiski, AK]({_last_img.url})")
+```
 
 ```{python}
 settings.title = settings.title.replace("Current Speed", "Direction [deg cw from True North]")
-settings.save_path = "docs/images/quickstart-sigma-direction-3day.png"
+settings.save_path = img("quickstart-sigma-direction-3day.png")
 
 tidal.plot_sigma_layers_direction(df, settings=settings)
 ```
 
-![3-day direction across sigma layers, Cook Inlet near Nikiski, AK](docs/images/quickstart-sigma-direction-3day.png)
+```{python}
+#| echo: false
+#| output: asis
+print(f"![3-day direction across sigma layers, Cook Inlet near Nikiski, AK]({_last_img.url})")
+```
 
 ### Depth perspective
 
@@ -188,12 +228,16 @@ tidal.plot_sigma_layers_speed(
         fig_height=3,
         caption=f"Latitude: {lat}, Longitude: {lon}",
         depth_perspective=DepthMode.FixedSurface,
-        save_path="docs/images/quickstart-sigma-speed-3day-surface.png",
+        save_path=img("quickstart-sigma-speed-3day-surface.png"),
     ),
 )
 ```
 
-![3-day current speed, fixed-surface perspective, Cook Inlet near Nikiski, AK](docs/images/quickstart-sigma-speed-3day-surface.png)
+```{python}
+#| echo: false
+#| output: asis
+print(f"![3-day current speed, fixed-surface perspective, Cook Inlet near Nikiski, AK]({_last_img.url})")
+```
 
 The default and recommended perspective for tidal energy work is `FixedBottom`:
 height above the seafloor, with the seafloor anchored at zero and the water
@@ -217,12 +261,16 @@ tidal.generate_tidal_joint_probability(
         title=f"Joint Probability Distribution\n{location_name}\nSigma Layer 4",
         fig_width=8,
         fig_height=8,
-        save_path="docs/images/quickstart-jpd-layer-4.png",
+        save_path=img("quickstart-jpd-layer-4.png"),
     ),
 )
 ```
 
-![Joint probability distribution at sigma layer 4, Cook Inlet near Nikiski, AK](docs/images/quickstart-jpd-layer-4.png)
+```{python}
+#| echo: false
+#| output: asis
+print(f"![Joint probability distribution at sigma layer 4, Cook Inlet near Nikiski, AK]({_last_img.url})")
+```
 
 ```{python}
 _, stats = tidal.plot_velocity_exceedance(
@@ -232,12 +280,16 @@ _, stats = tidal.plot_velocity_exceedance(
         fig_width=10,
         fig_height=5,
         caption=f"Latitude: {lat}, Longitude: {lon}",
-        save_path="docs/images/quickstart-velocity-exceedance.png",
+        save_path=img("quickstart-velocity-exceedance.png"),
     ),
 )
 ```
 
-![Velocity exceedance across all sigma layers, Cook Inlet near Nikiski, AK](docs/images/quickstart-velocity-exceedance.png)
+```{python}
+#| echo: false
+#| output: asis
+print(f"![Velocity exceedance across all sigma layers, Cook Inlet near Nikiski, AK]({_last_img.url})")
+```
 
 `plot_velocity_profile_with_histograms` produces a five-panel diagnostic overview of
 the full vertical structure of the tidal resource. From left to right: a mean velocity
@@ -255,12 +307,16 @@ tidal.plot_velocity_profile_with_histograms(
         fig_width=10,
         fig_height=16,
         caption=f"Latitude: {lat}, Longitude: {lon}",
-        save_path="docs/images/quickstart-velocity-profile.png",
+        save_path=img("quickstart-velocity-profile.png"),
     ),
 )
 ```
 
-![Velocity profile with histograms, Cook Inlet near Nikiski, AK](docs/images/quickstart-velocity-profile.png)
+```{python}
+#| echo: false
+#| output: asis
+print(f"![Velocity profile with histograms, Cook Inlet near Nikiski, AK]({_last_img.url})")
+```
 
 
 ## Dataset Variables
@@ -454,17 +510,18 @@ for site in sites:
             colorbar_max=speed_vmax,
             fig_width=9,
             fig_height=2.5,
-            save_path=f"docs/images/sigma-speed-{slug}.png",
+            save_path=img(f"sigma-speed-{slug}.png"),
         ),
     )
 ```
 
-![Current speed, Upper Cook Inlet, AK](docs/images/sigma-speed-upper-cook-inlet-ak.png)
-![Current speed, Tacoma Narrows, WA](docs/images/sigma-speed-tacoma-narrows-wa.png)
-![Current speed, Admiralty Inlet, WA](docs/images/sigma-speed-admiralty-inlet-wa.png)
-![Current speed, UNH Living Bridge, NH](docs/images/sigma-speed-unh-living-bridge-nh.png)
-![Current speed, Moose Island, Western Passage, ME](docs/images/sigma-speed-moose-island-western-passage-me.png)
-![Current speed, False Pass, Aleutian Islands, AK](docs/images/sigma-speed-false-pass-aleutian-islands-ak.png)
+```{python}
+#| echo: false
+#| output: asis
+for site in sites:
+    slug = site["label"].lower().replace(", ", "-").replace(" ", "-").replace(".", "")
+    print(f"![Current speed, {site['label']}]({img(f'sigma-speed-{slug}.png').url})")
+```
 
 ### Velocity exceedance: all sites
 
@@ -483,12 +540,16 @@ tidal.plot_multi_site_exceedance_overlay(
         title=f"Velocity Exceedance | All Sites (analysis depth ~{analysis_depth} m {depth_reference})",
         fig_height=3,
         fig_width=8,
-        save_path="docs/images/all-sites-exceedance-overlay.png",
+        save_path=img("all-sites-exceedance-overlay.png"),
     ),
 )
 ```
 
-![Velocity exceedance overlay, all six sites](docs/images/all-sites-exceedance-overlay.png)
+```{python}
+#| echo: false
+#| output: asis
+print(f"![Velocity exceedance overlay, all six sites]({_last_img.url})")
+```
 
 ### Joint probability distribution: all sites
 
@@ -507,12 +568,16 @@ tidal.plot_jpd_comparison_grid(
         title=f"Joint Probability Distribution | All Sites (analysis depth ~{analysis_depth} m {depth_reference})",
         fig_width=10,
         fig_height=13,
-        save_path="docs/images/all-sites-jpd-grid.png",
+        save_path=img("all-sites-jpd-grid.png"),
     ),
 )
 ```
 
-![Joint probability distribution grid, all six sites](docs/images/all-sites-jpd-grid.png)
+```{python}
+#| echo: false
+#| output: asis
+print(f"![Joint probability distribution grid, all six sites]({_last_img.url})")
+```
 
 ## Command Line Interface
 
