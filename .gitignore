@@ -18,6 +18,9 @@ venv/
 env/
 .env/
 
+# UV
+uv.lock
+
 # Testing & coverage
 .pytest_cache/
 .benchmarks/
