@@ -8,8 +8,6 @@ from typing import Annotated
 import typer
 import typer.rich_utils
 
-typer.rich_utils.STYLE_HELPTEXT = ""
-
 from ._display import console, error
 from ._geometry import parse_bbox, parse_geojson_file, parse_point, parse_wkt
 from ._options import (
@@ -38,6 +36,26 @@ from ._options import (
 from ._links import DATASET_CITATION, DOCS, GEOJSON_TOOL, S3_BROWSER, _link
 from ._run import run_multi, run_point
 
+# Blank out Typer's default help-text styling and pin its help colors to the
+# CLI palette (white, blue, and green, with bold only on blue and green).
+# Typer's defaults use cyan, yellow, magenta, and red. Set at import time,
+# before any command renders.
+typer.rich_utils.STYLE_HELPTEXT = ""
+typer.rich_utils.STYLE_OPTION = "bold bright_blue"
+typer.rich_utils.STYLE_SWITCH = "bold green"
+typer.rich_utils.STYLE_NEGATIVE_OPTION = "bright_blue"
+typer.rich_utils.STYLE_NEGATIVE_SWITCH = "green"
+typer.rich_utils.STYLE_METAVAR = "bright_blue"
+typer.rich_utils.STYLE_USAGE = "bright_blue"
+typer.rich_utils.STYLE_USAGE_COMMAND = "bold bright_blue"
+typer.rich_utils.STYLE_DEPRECATED = "bold bright_blue"
+typer.rich_utils.STYLE_REQUIRED_SHORT = "bold bright_blue"
+typer.rich_utils.STYLE_REQUIRED_LONG = "dim bright_blue"
+typer.rich_utils.STYLE_OPTION_ENVVAR = "dim green"
+typer.rich_utils.STYLE_COMMANDS_TABLE_FIRST_COLUMN = "bold green"
+typer.rich_utils.STYLE_ERRORS_PANEL_BORDER = "bright_blue"
+typer.rich_utils.STYLE_ABORTED = "bright_blue"
+
 _MAIN_HELP = (
     "Query and download modeled tidal current data from the U.S. DOE H2O High"
     " Resolution Tidal Hindcast — FVCOM simulations covering five U.S. coastal"
@@ -52,9 +70,9 @@ _MAIN_HELP = (
     f"Dataset citation: {_link(DATASET_CITATION)}\n"
     f"Documentation:    {_link(DOCS)}\n"
     f"AWS S3 browser:   {_link(S3_BROWSER)}\n\n"
-    "Provide [bold]exactly one[/] geometry input: a positional [cyan]lat,lon[/] for\n"
-    "a point query, or one of [bold]--coord[/], [bold]--bbox[/], [bold]--file[/],\n"
-    "or [bold]--wkt[/] for area queries."
+    "Provide [bright_blue]exactly one[/] geometry input: a positional [bright_blue]lat,lon[/]"
+    " for\na point query, or one of [bright_blue]--coord[/], [bright_blue]--bbox[/],"
+    " [bright_blue]--file[/],\nor [bright_blue]--wkt[/] for area queries."
 )
 
 app = typer.Typer(
@@ -97,19 +115,23 @@ def main(
     # ----- Geometry (exactly one required) -----
     location: Annotated[
         str | None,
-        typer.Argument(help="Point as [bold]lat,lon[/] (e.g. [cyan]60.73,-151.43[/])."),
+        typer.Argument(
+            help="Point as [bright_blue]lat,lon[/] (e.g. [bright_blue]60.73,-151.43[/])."
+        ),
     ] = None,
     coord: Annotated[
         list[str] | None,
         typer.Option(
             "--coord",
             "-c",
-            help="Transect waypoint as [bold]lat,lon[/]. Repeat for multi-segment lines.",
+            help="Transect waypoint as [bright_blue]lat,lon[/]. Repeat for multi-segment lines.",
         ),
     ] = None,
     bbox: Annotated[
         str | None,
-        typer.Option("--bbox", help="Bounding box as [bold]lat_min,lon_min,lat_max,lon_max[/]."),
+        typer.Option(
+            "--bbox", help="Bounding box as [bright_blue]lat_min,lon_min,lat_max,lon_max[/]."
+        ),
     ] = None,
     file: Annotated[
         Path | None,
@@ -216,14 +238,14 @@ def main(
                 error("Transect requires at least 2 --coord values.")
                 raise typer.Exit(1)
             session = conn.create_session()
-            with console.status("[cyan]Searching for intersecting faces…"):
+            with console.status("[bright_blue]Searching for intersecting faces…"):
                 results = session.query.query_all_on_path(waypoints)
             run_multi(results, session, opts)
 
         elif bbox is not None:
             polygon = parse_bbox(bbox)
             session = conn.create_session()
-            with console.status("[cyan]Searching for faces in bounding box…"):
+            with console.status("[bright_blue]Searching for faces in bounding box…"):
                 results = session.query.query_all_within_polygon(polygon)
             run_multi(results, session, opts)
 
@@ -233,14 +255,14 @@ def main(
                 raise typer.Exit(1)
             polygon = parse_geojson_file(file)
             session = conn.create_session()
-            with console.status("[cyan]Searching for faces within polygon…"):
+            with console.status("[bright_blue]Searching for faces within polygon…"):
                 results = session.query.query_all_within_polygon(polygon)
             run_multi(results, session, opts)
 
         elif wkt is not None:
             polygon = parse_wkt(wkt)
             session = conn.create_session()
-            with console.status("[cyan]Searching for faces within polygon…"):
+            with console.status("[bright_blue]Searching for faces within polygon…"):
                 results = session.query.query_all_within_polygon(polygon)
             run_multi(results, session, opts)
 

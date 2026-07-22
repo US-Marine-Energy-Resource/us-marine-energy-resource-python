@@ -77,7 +77,7 @@ def run_point(
     lon: float,
 ) -> None:
     """Execute a point query then download and display results."""
-    with console.status("[cyan]Searching for nearest face…"):
+    with console.status("[bright_blue]Searching for nearest face…"):
         result = session.query.query_nearest_point(lat, lon)
 
     if result is None:
@@ -98,7 +98,7 @@ def run_point(
 
     if opts.info_mode:
         file_path = point_file_path(result)
-        with console.status("[cyan]Fetching dataset info…"):
+        with console.status("[bright_blue]Fetching dataset info…"):
             run_info(session, opts, [file_path])
         return
 
@@ -123,7 +123,7 @@ def run_point(
             error("No S3 cache available — cannot download.")
             raise typer.Exit(1)
         check_size_limit(paths_by_location, session.cache, opts.max_size_mb)
-        with console.status("[cyan]Downloading…"):
+        with console.status("[bright_blue]Downloading…"):
             local_path = session.cache.get(file_path)
 
     stats_table(local_path)
@@ -137,21 +137,21 @@ def run_multi(
 ) -> None:
     """Download and display results for line / bbox / polygon queries."""
     if not results:
-        console.print("[yellow]No matching grid faces found.[/]")
+        console.print("[bright_blue]No matching grid faces found.[/]")
         raise typer.Exit(0)
 
     faces_table(results)
 
     if opts.info_mode:
         file_paths = multi_face_file_paths(results, session.query)
-        with console.status("[cyan]Fetching dataset info…"):
+        with console.status("[bright_blue]Fetching dataset info…"):
             run_info(session, opts, file_paths)
         return
 
     file_paths = multi_face_file_paths(results, session.query)
 
     paths_by_location: dict[str, list[str]] = {}
-    for r, fp in zip(results, file_paths):
+    for r, fp in zip(results, file_paths, strict=False):
         paths_by_location.setdefault(r["location"], []).append(fp)
 
     if opts.dry_run:
@@ -185,7 +185,7 @@ def _finalize(downloaded: dict[str, Path], session: Session, opts: QueryOptions)
         n = len(downloaded)
         console.print(
             f"\n  [bold green]✓[/]  {n} file{'s' if n != 1 else ''} "
-            f"saved to [cyan]{opts.output_dir}[/]"
+            f"saved to [bright_blue]{opts.output_dir}[/]"
         )
     elif session.cache is not None:
         cache_location(session.cache.cache_dir, len(downloaded))
@@ -199,4 +199,4 @@ def _finalize(downloaded: dict[str, Path], session: Session, opts: QueryOptions)
                 display = csv_path.relative_to(cwd)
             except ValueError:
                 display = csv_path
-            console.print(f"\n  [bold green]✓[/]  CSV saved: [cyan]{display}[/]")
+            console.print(f"\n  [bold green]✓[/]  CSV saved: [bright_blue]{display}[/]")
