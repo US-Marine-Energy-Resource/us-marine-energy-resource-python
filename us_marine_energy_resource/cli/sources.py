@@ -1,4 +1,4 @@
-"""Marine Energy Resource Data Source Specification"""
+"""Marine Energy Resource Data Source Specification."""
 
 from __future__ import annotations
 
