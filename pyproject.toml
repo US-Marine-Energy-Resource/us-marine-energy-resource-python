@@ -92,7 +92,8 @@ examples = [
 ]
 
 [project.scripts]
-us-tidal = "us_marine_energy_resource.cli:app"
+mer = "us_marine_energy_resource.mer:app"
+us-tidal = "us_marine_energy_resource.cli:us_tidal_entry"
 
 [tool.hatch.build.targets.wheel]
 packages = ["us_marine_energy_resource"]
