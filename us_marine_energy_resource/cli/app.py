@@ -269,3 +269,22 @@ def main(
     except ValueError as exc:
         error(str(exc))
         raise typer.Exit(1) from exc
+
+
+# Single-command app that runs the query without naming a subcommand, for the
+# standalone ``us-tidal`` console script. ``mer`` registers ``main`` directly as
+# its ``tidal`` leaf command (see mer.py), so the query stays positional there.
+tidal_app.command(help=_MAIN_HELP, epilog=_TIDAL_EPILOG)(main)
+
+# Backward-compatible alias.
+app = tidal_app
+
+
+# TODO(deprecate): Deprecate after v0.7
+def us_tidal_entry() -> None:
+    """Run the tidal query under the deprecated ``us-tidal`` name."""
+    console.print(
+        "[dim]note: 'us-tidal' is now 'mer tidal'; this alias will be removed in a"
+        " future release[/dim]"
+    )
+    tidal_app()
