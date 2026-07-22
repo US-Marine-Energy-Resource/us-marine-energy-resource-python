@@ -22,7 +22,15 @@ class UnknownFormatError(ExploreError):
 
 
 class DependencyError(ExploreError):
-    """A backend's third-party dependency is not installed."""
+    """A backend's third-party dependency is not installed.
+
+    Parameters
+    ----------
+    module : str
+        Name of the missing module.
+    purpose : str
+        What the module was needed for.
+    """
 
     def __init__(self, module: str, purpose: str) -> None:
         """Record the missing module and what it was needed for."""
@@ -41,12 +49,16 @@ class SourceError(ExploreError):
     """The file could not be reached or read from its location."""
 
 
-class TransferBudgetError(ExploreError):
-    """A read was refused before starting because it would exceed a limit."""
-
-
 class TransferBudgetExceededError(ExploreError):
-    """A read crossed its transfer limit while running and was stopped."""
+    """A read crossed its transfer limit while running and was stopped.
+
+    Parameters
+    ----------
+    fetched : int
+        Bytes fetched when the read was stopped.
+    limit : int
+        The transfer limit that was crossed.
+    """
 
     def __init__(self, fetched: int, limit: int) -> None:
         """Record bytes fetched and the limit that was crossed."""

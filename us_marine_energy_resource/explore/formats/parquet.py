@@ -46,12 +46,33 @@ class ParquetBackend:
 
     @contextmanager
     def open(self, handle: BinaryIO, ref: SourceRef) -> Iterator[ParquetOpenFile]:
-        """Open a parquet file from a binary handle."""
+        """Open a parquet file from a binary handle.
+
+        Parameters
+        ----------
+        handle : BinaryIO
+            Open binary file handle.
+        ref : SourceRef
+            Source the handle came from.
+
+        Yields
+        ------
+        ParquetOpenFile
+            Open file ready for reads.
+        """
         yield ParquetOpenFile(handle, ref)
 
 
 class ParquetOpenFile:
-    """Read structure and values from one parquet file."""
+    """Read structure and values from one parquet file.
+
+    Parameters
+    ----------
+    handle : BinaryIO
+        Open binary file handle.
+    ref : SourceRef
+        Source the handle came from.
+    """
 
     def __init__(self, handle: BinaryIO, ref: SourceRef) -> None:
         """Read the footer and column metadata."""
@@ -63,8 +84,19 @@ class ParquetOpenFile:
         self._num_rows = self._meta.num_rows
         self._names = list(self._schema.names)
 
-    def _column_storage(self, col_idx: int) -> tuple[StorageInfo, str | None]:
-        """Sum compressed and uncompressed sizes for a column across row groups."""
+    def _column_storage(self, col_idx: int) -> StorageInfo:
+        """Sum compressed and uncompressed sizes for a column across row groups.
+
+        Parameters
+        ----------
+        col_idx : int
+            Column index in the schema.
+
+        Returns
+        -------
+        StorageInfo
+            Storage sizes and compression for the column.
+        """
         stored = 0
         logical = 0
         compression: str | None = None
@@ -86,7 +118,18 @@ class ParquetOpenFile:
         )
 
     def _array_info(self, col_idx: int) -> ArrayInfo:
-        """Build the array description for a column."""
+        """Build the array description for a column.
+
+        Parameters
+        ----------
+        col_idx : int
+            Column index in the schema.
+
+        Returns
+        -------
+        ArrayInfo
+            Shape, dtype, and storage for the column.
+        """
         field = self._schema.field(col_idx)
         storage, _ = self._column_storage(col_idx)
         return ArrayInfo(
@@ -98,11 +141,23 @@ class ParquetOpenFile:
         )
 
     def _detail(self) -> str:
-        """Format string, e.g. ``Parquet 2.6, 4 row groups``."""
+        """Format string, e.g. ``Parquet 2.6, 4 row groups``.
+
+        Returns
+        -------
+        str
+            Short format description.
+        """
         return f"Parquet {self._meta.format_version}, {self._meta.num_row_groups} row groups"
 
     def header(self) -> FileHeader:
-        """Read file-level metadata from the footer; no per-column work."""
+        """Read file-level metadata from the footer; no per-column work.
+
+        Returns
+        -------
+        FileHeader
+            File-level metadata.
+        """
         from ...analysis.preprocessing import _extract_parquet_footer_info
 
         footer = _extract_parquet_footer_info(self._meta)
@@ -117,6 +172,16 @@ class ParquetOpenFile:
         """Describe the file: root attrs plus one node per column.
 
         Parquet sizes come from the footer, so ``storage`` costs nothing extra.
+
+        Parameters
+        ----------
+        storage : bool
+            Whether to include storage sizes.
+
+        Returns
+        -------
+        FileSummary
+            Structure and metadata for the whole file.
         """
         from ...analysis.preprocessing import _extract_parquet_footer_info
 
@@ -150,7 +215,18 @@ class ParquetOpenFile:
         )
 
     def node(self, path: NodePath) -> NodeInfo | None:
-        """Return the root group or one column node."""
+        """Return the root group or one column node.
+
+        Parameters
+        ----------
+        path : NodePath
+            Path to look up.
+
+        Returns
+        -------
+        NodeInfo or None
+            The node, or None if the path does not exist.
+        """
         if path.value == "/":
             return NodeInfo(
                 path=_ROOT, kind="group", attrs={}, array=None, n_children=len(self._names)
@@ -164,14 +240,43 @@ class ParquetOpenFile:
         )
 
     def _require_column(self, path: NodePath) -> int:
-        """Return a column index or raise if the path is not a column."""
+        """Return a column index or raise if the path is not a column.
+
+        Parameters
+        ----------
+        path : NodePath
+            Path that must name a column.
+
+        Returns
+        -------
+        int
+            Column index in the schema.
+
+        Raises
+        ------
+        NodeNotFoundError
+            If the path does not name a column.
+        """
         name = path.name
         if name not in self._names:
             raise NodeNotFoundError(f"no column at {path}")
         return self._names.index(name)
 
     def _row_groups_for(self, start: int, stop: int) -> list[int]:
-        """Return the row groups overlapping the half-open row range."""
+        """Return the row groups overlapping the half-open row range.
+
+        Parameters
+        ----------
+        start : int
+            First row of the range.
+        stop : int
+            Row after the last row of the range.
+
+        Returns
+        -------
+        list of int
+            Indices of the overlapping row groups.
+        """
         groups = []
         row0 = 0
         for rg in range(self._meta.num_row_groups):
@@ -182,7 +287,20 @@ class ParquetOpenFile:
         return groups
 
     def plan_read(self, path: NodePath, selection: Selection) -> ReadPlan:
-        """Estimate a read from footer metadata only."""
+        """Estimate a read from footer metadata only.
+
+        Parameters
+        ----------
+        path : NodePath
+            Column to read.
+        selection : Selection
+            Rows to read.
+
+        Returns
+        -------
+        ReadPlan
+            Cost estimate for the read.
+        """
         idx = self._require_column(path)
         node = self.node(path)
         assert node is not None and node.array is not None
@@ -204,7 +322,20 @@ class ParquetOpenFile:
         )
 
     def plan_stats(self, path: NodePath, spec: StatsSpec) -> ReadPlan:
-        """Estimate a stats read: all rows if exact, else the first max_elements."""
+        """Estimate a stats read: all rows if exact, else the first max_elements.
+
+        Parameters
+        ----------
+        path : NodePath
+            Column to read.
+        spec : StatsSpec
+            How the statistics will be computed.
+
+        Returns
+        -------
+        ReadPlan
+            Cost estimate for the read.
+        """
         idx = self._require_column(path)
         node = self.node(path)
         assert node is not None and node.array is not None
@@ -224,7 +355,20 @@ class ParquetOpenFile:
         )
 
     def _read_column_slice(self, idx: int, row_slice: slice) -> Any:
-        """Read a column over the row groups covering a slice, then apply the slice."""
+        """Read a column over the row groups covering a slice, then apply the slice.
+
+        Parameters
+        ----------
+        idx : int
+            Column index in the schema.
+        row_slice : slice
+            Rows to keep.
+
+        Returns
+        -------
+        Any
+            Pyarrow column data for the requested rows.
+        """
         import pyarrow as pa  # noqa: F401 - ensures pyarrow present for compute
 
         name = self._names[idx]
@@ -242,7 +386,20 @@ class ParquetOpenFile:
         return sliced[::step] if step != 1 else sliced
 
     def head(self, approved: ApprovedRead, decode: Decode = "none") -> HeadResult:
-        """Read the approved slice of one column. Parquet has no scale/offset to decode."""
+        """Read the approved slice of one column. Parquet has no scale/offset to decode.
+
+        Parameters
+        ----------
+        approved : ApprovedRead
+            Approved plan for the read.
+        decode : Decode
+            Decode mode. Ignored for parquet.
+
+        Returns
+        -------
+        HeadResult
+            Values read from the column.
+        """
         node = approved.plan.node
         idx = self._require_column(node.path)
         resolved = approved.plan.selection
@@ -259,7 +416,20 @@ class ParquetOpenFile:
         )
 
     def stats(self, approved: ApprovedRead, spec: StatsSpec) -> StatsResult:
-        """Compute statistics over the first rows of one column, per the spec."""
+        """Compute statistics over the first rows of one column, per the spec.
+
+        Parameters
+        ----------
+        approved : ApprovedRead
+            Approved plan for the read.
+        spec : StatsSpec
+            How the statistics are computed.
+
+        Returns
+        -------
+        StatsResult
+            Statistics for the column.
+        """
         np = lazy_import("numpy", "computing statistics")
         node = approved.plan.node
         idx = self._require_column(node.path)
@@ -270,7 +440,18 @@ class ParquetOpenFile:
 
 
 def _itemsize(dtype: str) -> int:
-    """Best-effort element size in bytes from a dtype string."""
+    """Best-effort element size in bytes from a dtype string.
+
+    Parameters
+    ----------
+    dtype : str
+        Dtype name.
+
+    Returns
+    -------
+    int
+        Element size in bytes.
+    """
     for token, size in (("64", 8), ("32", 4), ("16", 2), ("8", 1)):
         if token in dtype:
             return size

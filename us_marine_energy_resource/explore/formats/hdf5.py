@@ -48,7 +48,20 @@ class Hdf5Backend:
 
     @contextmanager
     def open(self, handle: BinaryIO, ref: SourceRef) -> Iterator[Hdf5OpenFile]:
-        """Open an HDF5 file from a binary handle."""
+        """Open an HDF5 file from a binary handle.
+
+        Parameters
+        ----------
+        handle : BinaryIO
+            Open binary handle to the file.
+        ref : SourceRef
+            Reference to where the file came from.
+
+        Yields
+        ------
+        Hdf5OpenFile
+            Reader for the opened file.
+        """
         h5py = lazy_import("h5py", "reading HDF5/netCDF-4 files")
         f = h5py.File(handle, "r")
         try:
@@ -58,17 +71,48 @@ class Hdf5Backend:
 
 
 class Hdf5OpenFile:
-    """Read structure and values from one HDF5 file."""
+    """Read structure and values from one HDF5 file.
+
+    Parameters
+    ----------
+    f : Any
+        Open h5py file object.
+    ref : SourceRef
+        Reference to where the file came from.
+    h5py : Any
+        Imported h5py module.
+    """
 
     def __init__(self, f: Any, ref: SourceRef, h5py: Any) -> None:
-        """Hold the open file and the h5py and numpy modules."""
+        """Hold the open file and the h5py and numpy modules.
+
+        Parameters
+        ----------
+        f : Any
+            Open h5py file object.
+        ref : SourceRef
+            Reference to where the file came from.
+        h5py : Any
+            Imported h5py module.
+        """
         self._f = f
         self._ref = ref
         self._h5py = h5py
         self._np = lazy_import("numpy", "reading HDF5 values")
 
     def _attr(self, val: Any) -> AttrValue:
-        """Convert an h5py attribute value to a JSON-safe form."""
+        """Convert an h5py attribute value to a JSON-safe form.
+
+        Parameters
+        ----------
+        val : Any
+            Attribute value as h5py returns it.
+
+        Returns
+        -------
+        AttrValue
+            JSON-safe value.
+        """
         np = self._np
         if isinstance(val, bytes):
             return val.decode("utf-8", "replace")
@@ -81,11 +125,33 @@ class Hdf5OpenFile:
         return str(val)
 
     def _attrs(self, obj: Any) -> dict[str, AttrValue]:
-        """Convert all attributes of a node."""
+        """Convert all attributes of a node.
+
+        Parameters
+        ----------
+        obj : Any
+            Group or dataset with attributes.
+
+        Returns
+        -------
+        dict[str, AttrValue]
+            Attribute names mapped to JSON-safe values.
+        """
         return {k: self._attr(v) for k, v in obj.attrs.items()}
 
     def _filters(self, dset: Any) -> tuple[str, ...]:
-        """List filter names from the dataset creation property list."""
+        """List filter names from the dataset creation property list.
+
+        Parameters
+        ----------
+        dset : Any
+            Open h5py dataset.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Filter names, empty if none or unreadable.
+        """
         names: list[str] = []
         try:
             dcpl = dset.id.get_create_plist()
@@ -97,7 +163,18 @@ class Hdf5OpenFile:
         return tuple(names)
 
     def _dim_names(self, dset: Any) -> tuple[str | None, ...]:
-        """Read per-axis dimension names from attached dimension scales."""
+        """Read per-axis dimension names from attached dimension scales.
+
+        Parameters
+        ----------
+        dset : Any
+            Open h5py dataset.
+
+        Returns
+        -------
+        tuple[str or None, ...]
+            One name per axis, with ``None`` where no scale is attached.
+        """
         names: list[str | None] = []
         try:
             for dim in dset.dims:
@@ -117,6 +194,18 @@ class Hdf5OpenFile:
         ``get_storage_size`` walks the chunk index, which is expensive for a
         large chunked dataset read over the network, so it runs only when
         ``sizes`` is set.
+
+        Parameters
+        ----------
+        dset : Any
+            Open h5py dataset.
+        sizes : bool
+            Whether to read the stored size from the chunk index.
+
+        Returns
+        -------
+        StorageInfo
+            Chunking, compression, and size details.
         """
         stored = ByteSize(dset.id.get_storage_size()) if sizes else None
         return StorageInfo(
@@ -128,7 +217,20 @@ class Hdf5OpenFile:
         )
 
     def _array(self, dset: Any, *, sizes: bool = False) -> ArrayInfo:
-        """Describe a dataset as an array."""
+        """Describe a dataset as an array.
+
+        Parameters
+        ----------
+        dset : Any
+            Open h5py dataset.
+        sizes : bool, optional
+            Whether to read the stored size from the chunk index.
+
+        Returns
+        -------
+        ArrayInfo
+            Shape, dtype, dimension names, fill value, and storage.
+        """
         return ArrayInfo(
             shape=tuple(dset.shape),
             dtype=str(dset.dtype),
@@ -138,12 +240,24 @@ class Hdf5OpenFile:
         )
 
     def _format_detail(self) -> str:
-        """Format string, e.g. ``netCDF-4, libhdf5 1.14.6``."""
+        """Format string, e.g. ``netCDF-4, libhdf5 1.14.6``.
+
+        Returns
+        -------
+        str
+            Format kind and the linked libhdf5 version.
+        """
         kind = "netCDF-4" if "_NCProperties" in self._f.attrs else "HDF5"
         return f"{kind}, libhdf5 {self._h5py.version.hdf5_version}"
 
     def header(self) -> FileHeader:
-        """Read root attributes and format only; no structure walk."""
+        """Read root attributes and format only; no structure walk.
+
+        Returns
+        -------
+        FileHeader
+            Source, format, and root attributes.
+        """
         return FileHeader(
             source=self._ref,
             format="hdf5",
@@ -152,7 +266,18 @@ class Hdf5OpenFile:
         )
 
     def summary(self, *, storage: bool = False) -> FileSummary:
-        """Walk the file and describe every group and dataset."""
+        """Walk the file and describe every group and dataset.
+
+        Parameters
+        ----------
+        storage : bool, optional
+            Whether to read stored sizes for each dataset.
+
+        Returns
+        -------
+        FileSummary
+            All nodes plus file level details.
+        """
         nodes: list[NodeInfo] = [
             NodeInfo(
                 path=NodePath("/"),
@@ -165,6 +290,15 @@ class Hdf5OpenFile:
         counts = {"arrays": 0, "groups": 1}
 
         def visit(name: str, obj: Any) -> None:
+            """Record one visited node.
+
+            Parameters
+            ----------
+            name : str
+                Path of the node relative to the root.
+            obj : Any
+                Visited group or dataset.
+            """
             path = NodePath("/" + name)
             if isinstance(obj, self._h5py.Dataset):
                 counts["arrays"] += 1
@@ -203,7 +337,18 @@ class Hdf5OpenFile:
         )
 
     def node(self, path: NodePath) -> NodeInfo | None:
-        """Return the node at a path, or ``None`` if it does not exist."""
+        """Return the node at a path, or ``None`` if it does not exist.
+
+        Parameters
+        ----------
+        path : NodePath
+            Path of the node to look up.
+
+        Returns
+        -------
+        NodeInfo or None
+            Description of the node, or ``None`` if the path is missing.
+        """
         key = "/" if path.value == "/" else path.value
         obj = self._f.get(key)
         if obj is None:
@@ -225,7 +370,23 @@ class Hdf5OpenFile:
         )
 
     def _require_dataset(self, path: NodePath) -> Any:
-        """Return a dataset or raise if the path is missing or a group."""
+        """Return a dataset or raise if the path is missing or a group.
+
+        Parameters
+        ----------
+        path : NodePath
+            Path that must name a dataset.
+
+        Returns
+        -------
+        Any
+            Open h5py dataset.
+
+        Raises
+        ------
+        NodeNotFoundError
+            If the path is missing or names a group.
+        """
         obj = self._f.get(path.value)
         if obj is None:
             raise NodeNotFoundError(f"no node at {path}")
@@ -236,7 +397,22 @@ class Hdf5OpenFile:
     def _chunk_transfer(
         self, dset: Any, slices: tuple[slice, ...], logical: int
     ) -> tuple[int, int]:
-        """Estimate transferred bytes and chunk count for reading slices."""
+        """Estimate transferred bytes and chunk count for reading slices.
+
+        Parameters
+        ----------
+        dset : Any
+            Open h5py dataset.
+        slices : tuple[slice, ...]
+            Resolved per-axis slices to read.
+        logical : int
+            Logical size of the selection in bytes.
+
+        Returns
+        -------
+        tuple[int, int]
+            Estimated transferred bytes and number of touched chunks.
+        """
         if not dset.chunks or dset.id.get_storage_size() == 0:
             return logical, 1
         touched = 1
@@ -251,7 +427,20 @@ class Hdf5OpenFile:
         return transferred, touched
 
     def plan_read(self, path: NodePath, selection: Selection) -> ReadPlan:
-        """Estimate a value read from chunk geometry only."""
+        """Estimate a value read from chunk geometry only.
+
+        Parameters
+        ----------
+        path : NodePath
+            Path of the dataset to read.
+        selection : Selection
+            Requested part of the array.
+
+        Returns
+        -------
+        ReadPlan
+            Estimated cost of the read.
+        """
         dset = self._require_dataset(path)
         node = self.node(path)
         assert node is not None and node.array is not None
@@ -267,14 +456,40 @@ class Hdf5OpenFile:
         )
 
     def _sample_rows(self, dset: Any, spec: StatsSpec) -> int:
-        """Return how many axis-0 rows a sampled stats read will cover."""
+        """Return how many axis-0 rows a sampled stats read will cover.
+
+        Parameters
+        ----------
+        dset : Any
+            Open h5py dataset.
+        spec : StatsSpec
+            Stats request with the element budget.
+
+        Returns
+        -------
+        int
+            Number of axis-0 rows to sample.
+        """
         shape = dset.shape
         rows_per = math.prod(shape[1:]) if len(shape) > 1 else 1
         max_rows = max(1, spec.max_elements // max(1, rows_per))
         return min(shape[0], max_rows)
 
     def plan_stats(self, path: NodePath, spec: StatsSpec) -> ReadPlan:
-        """Estimate a stats read: all chunks if exact, else strided chunks."""
+        """Estimate a stats read: all chunks if exact, else strided chunks.
+
+        Parameters
+        ----------
+        path : NodePath
+            Path of the dataset to summarize.
+        spec : StatsSpec
+            Stats request with the element budget.
+
+        Returns
+        -------
+        ReadPlan
+            Estimated cost of the read.
+        """
         dset = self._require_dataset(path)
         node = self.node(path)
         assert node is not None and node.array is not None
@@ -303,7 +518,20 @@ class Hdf5OpenFile:
         )
 
     def head(self, approved: ApprovedRead, decode: Decode = "none") -> HeadResult:
-        """Read the approved slice, optionally applying scale/offset."""
+        """Read the approved slice, optionally applying scale/offset.
+
+        Parameters
+        ----------
+        approved : ApprovedRead
+            Read plan that passed the budget check.
+        decode : Decode, optional
+            Scaling convention to apply.
+
+        Returns
+        -------
+        HeadResult
+            Values plus shape, dtype, and decode notes.
+        """
         node = approved.plan.node
         dset = self._require_dataset(node.path)
         resolved = approved.plan.selection
@@ -320,7 +548,22 @@ class Hdf5OpenFile:
         )
 
     def _decode(self, dset: Any, data: Any, decode: Decode) -> tuple[Any, Decode, tuple[str, ...]]:
-        """Apply CF or rex scaling, or report unapplied scale attributes."""
+        """Apply CF or rex scaling, or report unapplied scale attributes.
+
+        Parameters
+        ----------
+        dset : Any
+            Open h5py dataset with the scale attributes.
+        data : Any
+            Raw values read from the dataset.
+        decode : Decode
+            Scaling convention to apply.
+
+        Returns
+        -------
+        tuple[Any, Decode, tuple[str, ...]]
+            Values, the convention applied, and any notes.
+        """
         sf = dset.attrs.get("scale_factor")
         offset = dset.attrs.get("add_offset")
         add = float(offset) if offset is not None else 0.0
@@ -338,7 +581,20 @@ class Hdf5OpenFile:
         return data, "none", tuple(notes)
 
     def stats(self, approved: ApprovedRead, spec: StatsSpec) -> StatsResult:
-        """Compute statistics over a strided chunk sample, or the full array if exact."""
+        """Compute statistics over a strided chunk sample, or the full array if exact.
+
+        Parameters
+        ----------
+        approved : ApprovedRead
+            Read plan that passed the budget check.
+        spec : StatsSpec
+            Stats request with the element budget.
+
+        Returns
+        -------
+        StatsResult
+            Summary statistics and how they were sampled.
+        """
         np = lazy_import("numpy", "computing statistics")
         node = approved.plan.node
         dset = self._require_dataset(node.path)
@@ -359,7 +615,20 @@ class Hdf5OpenFile:
         return _summarize(np, data, node.path, total, read, method, spec)
 
     def _strided_sample(self, dset: Any, spec: StatsSpec) -> Any:
-        """Read evenly spaced axis-0 blocks until the element budget is met."""
+        """Read evenly spaced axis-0 blocks until the element budget is met.
+
+        Parameters
+        ----------
+        dset : Any
+            Open h5py dataset.
+        spec : StatsSpec
+            Stats request with the element budget.
+
+        Returns
+        -------
+        Any
+            Flat numpy array of the sampled values.
+        """
         np = lazy_import("numpy", "computing statistics")
         shape = dset.shape
         block = dset.chunks[0] if dset.chunks else max(1, self._sample_rows(dset, spec))
@@ -380,14 +649,36 @@ class Hdf5OpenFile:
 
 
 def _n_chunks(dset: Any) -> int:
-    """Total number of chunks in a dataset, or 1 if contiguous."""
+    """Total number of chunks in a dataset, or 1 if contiguous.
+
+    Parameters
+    ----------
+    dset : Any
+        Open h5py dataset.
+
+    Returns
+    -------
+    int
+        Chunk count.
+    """
     if not dset.chunks:
         return 1
     return math.prod(math.ceil(d / c) for d, c in zip(dset.shape, dset.chunks, strict=False))
 
 
 def _to_jsonable(data: Any) -> AttrValue:
-    """Convert a numpy array or scalar to nested JSON-safe lists."""
+    """Convert a numpy array or scalar to nested JSON-safe lists.
+
+    Parameters
+    ----------
+    data : Any
+        Numpy array or scalar, or an already plain value.
+
+    Returns
+    -------
+    AttrValue
+        JSON-safe value.
+    """
     if hasattr(data, "tolist"):
         out = data.tolist()
         return _bytes_to_str(out)
@@ -395,7 +686,18 @@ def _to_jsonable(data: Any) -> AttrValue:
 
 
 def _bytes_to_str(obj: Any) -> AttrValue:
-    """Recursively decode bytes in nested lists."""
+    """Recursively decode bytes in nested lists.
+
+    Parameters
+    ----------
+    obj : Any
+        Value that may be or contain bytes.
+
+    Returns
+    -------
+    AttrValue
+        Value with all bytes decoded to text.
+    """
     if isinstance(obj, bytes):
         return obj.decode("utf-8", "replace")
     if isinstance(obj, list):

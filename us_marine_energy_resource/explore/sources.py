@@ -21,7 +21,18 @@ from .model import ByteSize, SourceRef
 
 
 class LocalSource:
-    """A file on the local filesystem, including HPC paths like ``/projects/...``."""
+    """A file on the local filesystem, including HPC paths like ``/projects/...``.
+
+    Parameters
+    ----------
+    path : Path
+        Location of the file on disk.
+
+    Raises
+    ------
+    SourceError
+        If the path is not a file.
+    """
 
     def __init__(self, path: Path) -> None:
         """Record the path and stat its size."""
@@ -35,22 +46,57 @@ class LocalSource:
     def open_binary(
         self, max_bytes: int | None = None, block_size: int | None = None
     ) -> Iterator[BinaryIO]:
-        """Open the file for reading. Local reads move nothing, so limits are ignored."""
+        """Open the file for reading. Local reads move nothing, so limits are ignored.
+
+        Parameters
+        ----------
+        max_bytes : int or None
+            Ignored for local files.
+        block_size : int or None
+            Ignored for local files.
+
+        Yields
+        ------
+        BinaryIO
+            A seekable handle on the file.
+        """
         with open(self._path, "rb") as handle:
             yield handle
 
     def peek(self, n: int) -> bytes:
-        """Read the first ``n`` bytes."""
+        """Read the first ``n`` bytes.
+
+        Parameters
+        ----------
+        n : int
+            Number of bytes to read.
+
+        Returns
+        -------
+        bytes
+            The bytes read.
+        """
         with open(self._path, "rb") as handle:
             return handle.read(n)
 
-    def materialize(self, approved: ApprovedRead) -> Path:
-        """Return the existing local path; nothing to download."""
-        return self._path
-
 
 class S3Source:
-    """An object in S3, read over range requests without downloading the whole file."""
+    """An object in S3, read over range requests without downloading the whole file.
+
+    Parameters
+    ----------
+    bucket : str
+        Name of the bucket.
+    key : str
+        Key of the object within the bucket.
+    aws_profile : str, optional
+        AWS profile for signed access. Anonymous when omitted.
+
+    Raises
+    ------
+    SourceError
+        If the object cannot be reached.
+    """
 
     def __init__(self, bucket: str, key: str, aws_profile: str | None = None) -> None:
         """Resolve the object's region and size."""
@@ -71,7 +117,13 @@ class S3Source:
         )
 
     def _fs(self):
-        """Build an S3 filesystem, anonymous unless a profile is set."""
+        """Build an S3 filesystem, anonymous unless a profile is set.
+
+        Returns
+        -------
+        pyarrow.fs.S3FileSystem
+            Filesystem bound to the bucket's region.
+        """
         fs_mod = lazy_import("pyarrow.fs", "reading files from S3")
         region = fs_mod.resolve_s3_region(self._bucket)
         if self._profile:
@@ -82,11 +134,38 @@ class S3Source:
     def open_binary(
         self, max_bytes: int | None = None, block_size: int | None = None
     ) -> Iterator[BinaryIO]:
-        """Open a block-cached, range-backed handle to the object."""
+        """Open a block-cached, range-backed handle to the object.
+
+        Parameters
+        ----------
+        max_bytes : int or None
+            Cap on total bytes fetched, or no cap.
+        block_size : int or None
+            Bytes fetched per block, or the default.
+
+        Yields
+        ------
+        BinaryIO
+            A seekable buffered handle on the object.
+        """
         size = self.ref.size.bytes if self.ref.size is not None else 0
         native = self._fs().open_input_file(self._s3_path)
 
         def fetch(offset: int, length: int) -> bytes:
+            """Read one range from the object.
+
+            Parameters
+            ----------
+            offset : int
+                Start byte.
+            length : int
+                Number of bytes to read.
+
+            Returns
+            -------
+            bytes
+                The bytes read.
+            """
             native.seek(offset)
             return native.read(length)
 
@@ -97,17 +176,35 @@ class S3Source:
             native.close()
 
     def peek(self, n: int) -> bytes:
-        """Read the first ``n`` bytes with one range request."""
+        """Read the first ``n`` bytes with one range request.
+
+        Parameters
+        ----------
+        n : int
+            Number of bytes to read.
+
+        Returns
+        -------
+        bytes
+            The bytes read.
+        """
         with self._fs().open_input_file(self._s3_path) as native:
             return native.read(n)
 
-    def materialize(self, approved: ApprovedRead) -> Path:
-        """Download the whole object to a temp file and return its path."""
-        raise SourceError("download of S3 objects is not implemented yet")
-
 
 class HttpSource:
-    """A file served over HTTP(S), read with range requests when the server allows."""
+    """A file served over HTTP(S), read with range requests when the server allows.
+
+    Parameters
+    ----------
+    url : str
+        Address of the file.
+
+    Raises
+    ------
+    SourceError
+        If the URL cannot be reached.
+    """
 
     def __init__(self, url: str) -> None:
         """Probe the URL for size and range support."""
@@ -127,7 +224,25 @@ class HttpSource:
     def open_binary(
         self, max_bytes: int | None = None, block_size: int | None = None
     ) -> Iterator[BinaryIO]:
-        """Open a block-cached handle backed by HTTP range requests."""
+        """Open a block-cached handle backed by HTTP range requests.
+
+        Parameters
+        ----------
+        max_bytes : int or None
+            Cap on total bytes fetched, or no cap.
+        block_size : int or None
+            Bytes fetched per block, or the default.
+
+        Yields
+        ------
+        BinaryIO
+            A seekable buffered handle on the file.
+
+        Raises
+        ------
+        SourceError
+            If the server does not support range requests.
+        """
         if not self._accept_ranges or self.ref.size is None:
             raise SourceError(
                 f"{self._url} does not support range requests; a full download is required"
@@ -135,6 +250,20 @@ class HttpSource:
         requests = lazy_import("requests", "reading files over HTTP(S)")
 
         def fetch(offset: int, length: int) -> bytes:
+            """Read one range over HTTP.
+
+            Parameters
+            ----------
+            offset : int
+                Start byte.
+            length : int
+                Number of bytes to read.
+
+            Returns
+            -------
+            bytes
+                The bytes read.
+            """
             headers = {"Range": f"bytes={offset}-{offset + length - 1}"}
             resp = requests.get(self._url, headers=headers, timeout=60)
             resp.raise_for_status()
@@ -147,7 +276,18 @@ class HttpSource:
         )
 
     def peek(self, n: int) -> bytes:
-        """Read the first ``n`` bytes with one range request."""
+        """Read the first ``n`` bytes with one range request.
+
+        Parameters
+        ----------
+        n : int
+            Number of bytes to read.
+
+        Returns
+        -------
+        bytes
+            The bytes read.
+        """
         requests = lazy_import("requests", "reading files over HTTP(S)")
         resp = requests.get(self._url, headers={"Range": f"bytes=0-{n - 1}"}, timeout=30)
         resp.raise_for_status()

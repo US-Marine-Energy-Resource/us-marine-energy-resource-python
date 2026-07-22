@@ -47,17 +47,35 @@ class Listing:
 
     @property
     def n_files(self) -> int:
-        """Number of file entries shown."""
+        """Return the number of file entries shown.
+
+        Returns
+        -------
+        int
+            Count of entries that are files.
+        """
         return sum(1 for e in self.entries if not e.is_dir)
 
     @property
     def n_dirs(self) -> int:
-        """Number of directory entries shown."""
+        """Return the number of directory entries shown.
+
+        Returns
+        -------
+        int
+            Count of entries that are directories.
+        """
         return sum(1 for e in self.entries if e.is_dir)
 
     @property
     def total_file_bytes(self) -> int:
-        """Sum of shown file sizes."""
+        """Return the sum of shown file sizes.
+
+        Returns
+        -------
+        int
+            Total bytes across the file entries.
+        """
         return sum(e.size or 0 for e in self.entries if not e.is_dir)
 
 
@@ -84,7 +102,13 @@ class PrefixPointer:
 
     @property
     def uri(self) -> str:
-        """Display URI for the prefix."""
+        """Return the display URI for the prefix.
+
+        Returns
+        -------
+        str
+            URI shown to the user.
+        """
         return f"s3://{self.bucket}/{self.prefix}" if self.kind == "s3" else self.prefix
 
 
@@ -97,7 +121,18 @@ class FilePointer:
 
 
 def _has_data_ext(name: str) -> bool:
-    """Whether a name ends in a recognized data-file extension."""
+    """Return whether a name ends in a recognized data-file extension.
+
+    Parameters
+    ----------
+    name : str
+        File or object name to test.
+
+    Returns
+    -------
+    bool
+        True if the name has a data-file extension.
+    """
     return name.lower().endswith(_DATA_EXTS)
 
 
@@ -106,6 +141,16 @@ def resolve_path(arg: str) -> PrefixPointer | FilePointer:
 
     Uses only the argument's shape (endpoint, scheme, extension, trailing
     slash, local ``is_dir``); it makes no network calls.
+
+    Parameters
+    ----------
+    arg : str
+        Path to classify.
+
+    Returns
+    -------
+    PrefixPointer or FilePointer
+        Pointer to a directory-like prefix or to a single file.
     """
     if arg in ENDPOINTS:
         bucket, prefix = ENDPOINTS[arg]
@@ -140,12 +185,38 @@ class Lister(Protocol):
     """Lists the immediate children of a prefix."""
 
     def list_children(self, prefix: str, limit: int, name_filter: str | None) -> Listing:
-        """Return capped immediate children of ``prefix``."""
+        """Return capped immediate children of ``prefix``.
+
+        Parameters
+        ----------
+        prefix : str
+            Prefix to list.
+        limit : int
+            Maximum number of entries to return.
+        name_filter : str or None
+            Optional glob applied to entry names.
+
+        Returns
+        -------
+        Listing
+            Capped immediate children of the prefix.
+        """
         ...
 
 
 def make_client(aws_profile: str | None = None) -> Any:
-    """Build an S3 client: anonymous by default, or a named profile."""
+    """Build an S3 client: anonymous by default, or a named profile.
+
+    Parameters
+    ----------
+    aws_profile : str or None
+        Named AWS profile to use. Anonymous access when None.
+
+    Returns
+    -------
+    Any
+        The boto3 S3 client.
+    """
     import boto3
     from botocore import UNSIGNED
     from botocore.config import Config
@@ -156,7 +227,15 @@ def make_client(aws_profile: str | None = None) -> Any:
 
 
 class S3Lister:
-    """Lists an S3 bucket via delimited, page-bounded ``list_objects_v2``."""
+    """Lists an S3 bucket via delimited, page-bounded ``list_objects_v2``.
+
+    Parameters
+    ----------
+    client : Any
+        The boto3 S3 client to call.
+    bucket : str
+        Bucket to list.
+    """
 
     def __init__(self, client: Any, bucket: str) -> None:
         """Hold the client and bucket."""
@@ -164,7 +243,22 @@ class S3Lister:
         self._bucket = bucket
 
     def list_children(self, prefix: str, limit: int, name_filter: str | None) -> Listing:
-        """Return immediate children of a prefix, capped and page-bounded."""
+        """Return immediate children of a prefix, capped and page-bounded.
+
+        Parameters
+        ----------
+        prefix : str
+            Prefix to list.
+        limit : int
+            Maximum number of entries to return.
+        name_filter : str or None
+            Optional glob applied to entry names.
+
+        Returns
+        -------
+        Listing
+            Capped immediate children of the prefix.
+        """
         entries: list[Entry] = []
         token: str | None = None
         more = False
@@ -201,7 +295,22 @@ class LocalLister:
     """Lists a local directory one level deep."""
 
     def list_children(self, prefix: str, limit: int, name_filter: str | None) -> Listing:
-        """Return immediate children of a local directory, capped."""
+        """Return immediate children of a local directory, capped.
+
+        Parameters
+        ----------
+        prefix : str
+            Directory to list.
+        limit : int
+            Maximum number of entries to return.
+        name_filter : str or None
+            Optional glob applied to entry names.
+
+        Returns
+        -------
+        Listing
+            Capped immediate children of the directory.
+        """
         entries: list[Entry] = []
         with os.scandir(prefix) as it:
             for de in sorted(it, key=lambda d: (not d.is_dir(), d.name)):
@@ -214,21 +323,64 @@ class LocalLister:
 
 
 def make_lister(pointer: PrefixPointer, aws_profile: str | None = None) -> Lister:
-    """Build the right lister for a prefix pointer."""
+    """Build the right lister for a prefix pointer.
+
+    Parameters
+    ----------
+    pointer : PrefixPointer
+        Location to list.
+    aws_profile : str or None
+        Named AWS profile passed to the S3 client. Anonymous when None.
+
+    Returns
+    -------
+    Lister
+        Lister matched to the pointer kind.
+    """
     if pointer.kind == "local":
         return LocalLister()
     return S3Lister(make_client(aws_profile), pointer.bucket)
 
 
 def _match(name: str, name_filter: str | None) -> bool:
-    """Whether a name passes an optional glob filter."""
+    """Return whether a name passes an optional glob filter.
+
+    Parameters
+    ----------
+    name : str
+        Name to test.
+    name_filter : str or None
+        Glob pattern. Every name passes when None.
+
+    Returns
+    -------
+    bool
+        True if the name matches or no filter is set.
+    """
     return name_filter is None or fnmatch.fnmatch(name, name_filter)
 
 
 def list_children(
     lister: Lister, prefix: str, limit: int = 200, name_filter: str | None = None
 ) -> Listing:
-    """List one level under a prefix."""
+    """List one level under a prefix.
+
+    Parameters
+    ----------
+    lister : Lister
+        Backend that performs the listing.
+    prefix : str
+        Prefix to list.
+    limit : int
+        Maximum number of entries to return.
+    name_filter : str or None
+        Optional glob applied to entry names.
+
+    Returns
+    -------
+    Listing
+        Capped immediate children of the prefix.
+    """
     return lister.list_children(prefix, limit, name_filter)
 
 
@@ -245,6 +397,10 @@ def build_tree(
 
     Parameters
     ----------
+    lister : Lister
+        Backend that performs the listing.
+    prefix : str
+        Prefix at the root of the tree.
     depth : int
         Levels to expand. ``1`` lists only immediate children; ``2`` also lists
         each child directory, and so on.
@@ -254,6 +410,11 @@ def build_tree(
         Glob applied at the top level only.
     on_list : callable, optional
         Called with each prefix just before it is listed, for progress display.
+
+    Returns
+    -------
+    TreeNode
+        Root node of the browsed tree.
     """
     if on_list is not None:
         on_list(prefix)

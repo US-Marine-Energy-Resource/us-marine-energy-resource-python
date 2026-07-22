@@ -49,7 +49,13 @@ class ResolvedSelection:
 
     @property
     def n_elements(self) -> int:
-        """Number of elements the slices select."""
+        """Number of elements the slices select.
+
+        Returns
+        -------
+        int
+            Number of elements the slices select.
+        """
         total = 1
         for s in self.slices:
             total *= len(range(s.start, s.stop, s.step or 1))
@@ -57,7 +63,25 @@ class ResolvedSelection:
 
 
 def _parse_axis(token: str, length: int) -> slice:
-    """Parse one axis token (``5``, ``0:10``, ``::2``) against an axis length."""
+    """Parse one axis token (``5``, ``0:10``, ``::2``) against an axis length.
+
+    Parameters
+    ----------
+    token : str
+        One axis of the slice string.
+    length : int
+        Length of the axis being sliced.
+
+    Returns
+    -------
+    slice
+        Concrete slice with resolved start, stop, and step.
+
+    Raises
+    ------
+    ValueError
+        If the token is malformed or out of range.
+    """
     token = token.strip()
     if ":" not in token:
         idx = int(token)

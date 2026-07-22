@@ -40,7 +40,13 @@ class ReadPlan:
 
     @property
     def amplification(self) -> float:
-        """Transferred bytes divided by requested bytes."""
+        """Transferred bytes divided by requested bytes.
+
+        Returns
+        -------
+        float
+            The ratio, or one when nothing was requested.
+        """
         if self.logical.bytes == 0:
             return 1.0
         return self.transferred.bytes / self.logical.bytes
@@ -94,7 +100,13 @@ class ApprovedRead:
     _token: dataclasses.InitVar[object]
 
     def __post_init__(self, _token: object) -> None:
-        """Reject construction outside ``TransferPolicy.approve``."""
+        """Reject construction outside ``TransferPolicy.approve``.
+
+        Parameters
+        ----------
+        _token : object
+            Proof that ``approve`` created this instance.
+        """
         if _token is not _GATE_TOKEN:
             raise TypeError("ApprovedRead is created only by TransferPolicy.approve")
 
@@ -118,7 +130,13 @@ class Refusal:
     alternatives: tuple[str, ...]
 
     def message(self) -> str:
-        """One-line reason plus the suggested alternatives."""
+        """One-line reason plus the suggested alternatives.
+
+        Returns
+        -------
+        str
+            The reason, followed by commands to try instead.
+        """
         head = (
             f"Refused: read would use {self.plan.transferred} "
             f"({self.limit_kind} limit {self.limit}). {self.cause}"
@@ -130,7 +148,18 @@ class Refusal:
 
 
 def _cause(plan: ReadPlan) -> str:
-    """Describe why a read is as large as it is."""
+    """Describe why a read is as large as it is.
+
+    Parameters
+    ----------
+    plan : ReadPlan
+        The proposed read.
+
+    Returns
+    -------
+    str
+        A short description, empty when the node has no array.
+    """
     arr = plan.node.array
     if arr is None:
         return ""
@@ -146,7 +175,18 @@ def _cause(plan: ReadPlan) -> str:
 
 
 def _alternatives(plan: ReadPlan) -> tuple[str, ...]:
-    """Suggest cheaper commands for an over-budget read."""
+    """Suggest cheaper commands for an over-budget read.
+
+    Parameters
+    ----------
+    plan : ReadPlan
+        The refused read.
+
+    Returns
+    -------
+    tuple of str
+        Example commands to run instead.
+    """
     path = plan.node.path
     return (
         f"mer explore stats <uri> --path {path}                # sampled, reports sample_fraction",

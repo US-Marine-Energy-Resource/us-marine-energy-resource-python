@@ -35,8 +35,14 @@ class ByteSize:
 
     @property
     def mb(self) -> float:
-        """Size in megabytes."""
-        return self.bytes / _MB
+        """Size in megabytes.
+
+        Returns
+        -------
+        float
+            Size in megabytes.
+        """
+        return self.bytes / MB
 
     def __str__(self) -> str:
         """Human-readable size, e.g. ``4.2 GB``."""
@@ -61,12 +67,24 @@ class NodePath:
 
     @property
     def name(self) -> str:
-        """Final path segment (``""`` for the root)."""
+        """Final path segment (``""`` for the root).
+
+        Returns
+        -------
+        str
+            The final segment, or an empty string for the root.
+        """
         return self.value.rstrip("/").rsplit("/", 1)[-1]
 
     @property
     def depth(self) -> int:
-        """Number of segments below the root."""
+        """Number of segments below the root.
+
+        Returns
+        -------
+        int
+            Number of segments below the root.
+        """
         return self.value.strip("/").count("/") + 1 if self.value.strip("/") else 0
 
     def __str__(self) -> str:
@@ -96,7 +114,13 @@ class StorageInfo:
 
     @property
     def compression_ratio(self) -> float | None:
-        """Logical bytes divided by stored bytes, or ``None`` if unknown."""
+        """Logical bytes divided by stored bytes, or ``None`` if unknown.
+
+        Returns
+        -------
+        float or None
+            Ratio of logical to stored bytes, or ``None`` if unknown.
+        """
         if self.stored is None or self.logical is None or self.stored.bytes == 0:
             return None
         return round(self.logical.bytes / self.stored.bytes, 2)
@@ -125,7 +149,13 @@ class NodeInfo:
 
     @property
     def name(self) -> str:
-        """Final segment of the node path."""
+        """Final segment of the node path.
+
+        Returns
+        -------
+        str
+            The final segment of the node path.
+        """
         return self.path.name
 
 
