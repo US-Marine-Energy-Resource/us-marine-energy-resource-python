@@ -30,6 +30,7 @@ from ..model import (
     StorageInfo,
 )
 from ..selection import FirstN, Selection, resolve
+from ._stats import summarize
 
 _ROOT = NodePath("/")
 
@@ -38,11 +39,6 @@ class ParquetBackend:
     """Open parquet files."""
 
     format = "parquet"
-
-    @staticmethod
-    def sniff(head: bytes) -> bool:
-        """Return whether the leading bytes are the parquet magic."""
-        return head.startswith(b"PAR1")
 
     @contextmanager
     def open(self, handle: BinaryIO, ref: SourceRef) -> Iterator[ParquetOpenFile]:
@@ -106,15 +102,12 @@ class ParquetOpenFile:
             logical += chunk.total_uncompressed_size
             compression = chunk.compression
         comp = None if compression in (None, "UNCOMPRESSED") else str(compression)
-        return (
-            StorageInfo(
-                chunks=None,
-                compression=comp,
-                filters=(),
-                stored=ByteSize(stored),
-                logical=ByteSize(logical),
-            ),
-            comp,
+        return StorageInfo(
+            chunks=None,
+            compression=comp,
+            filters=(),
+            stored=ByteSize(stored),
+            logical=ByteSize(logical),
         )
 
     def _array_info(self, col_idx: int) -> ArrayInfo:
@@ -131,7 +124,7 @@ class ParquetOpenFile:
             Shape, dtype, and storage for the column.
         """
         field = self._schema.field(col_idx)
-        storage, _ = self._column_storage(col_idx)
+        storage = self._column_storage(col_idx)
         return ArrayInfo(
             shape=(self._num_rows,),
             dtype=str(field.type),
@@ -436,7 +429,9 @@ class ParquetOpenFile:
         rows = self._num_rows if spec.exact else min(spec.max_elements, self._num_rows)
         arr = self._read_column_slice(idx, slice(0, rows, 1))
         values = np.asarray(arr.to_pylist())
-        return _summarize(np, values, node.path, self._num_rows, spec)
+        read = int(values.size)
+        method = "full" if read >= self._num_rows else "chunk-strided"
+        return summarize(np, values, node.path, self._num_rows, read, method, spec)
 
 
 def _itemsize(dtype: str) -> int:
@@ -456,37 +451,3 @@ def _itemsize(dtype: str) -> int:
         if token in dtype:
             return size
     return 8
-
-
-def _summarize(np: Any, values: Any, path: NodePath, total: int, spec: StatsSpec) -> StatsResult:
-    """Reduce a 1-D array to a StatsResult, reporting how much was covered."""
-    read = int(values.size)
-    numeric = values.dtype.kind in "iufc"
-    if not numeric or read == 0:
-        return StatsResult(
-            path=path,
-            count=read,
-            n_nan=0,
-            mean=None,
-            std=None,
-            min=None,
-            max=None,
-            sampled=read < total,
-            sample_fraction=(read / total) if total else 1.0,
-            sample_method="full" if read >= total else "chunk-strided",
-        )
-    flat = values.astype("float64").ravel()
-    n_nan = int(np.isnan(flat).sum())
-    clean = flat[~np.isnan(flat)] if spec.nan_policy == "omit" else flat
-    return StatsResult(
-        path=path,
-        count=read,
-        n_nan=n_nan,
-        mean=float(np.mean(clean)) if clean.size else None,
-        std=float(np.std(clean)) if clean.size else None,
-        min=float(np.min(clean)) if clean.size else None,
-        max=float(np.max(clean)) if clean.size else None,
-        sampled=read < total,
-        sample_fraction=(read / total) if total else 1.0,
-        sample_method="full" if read >= total else "chunk-strided",
-    )

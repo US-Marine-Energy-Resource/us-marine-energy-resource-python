@@ -10,21 +10,21 @@ on: ``ApprovedRead`` (go), ``NeedsConfirm`` (ask the user), or ``Refusal``
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 
-from .model import ByteSize, NodeInfo
+from .config import CONFIG
+from .model import MB, ByteSize, NodeInfo
 from .selection import ResolvedSelection
-
-_MB = 1024 * 1024
 
 # Default ceilings, as module constants so they are not re-evaluated as
 # function-call dataclass defaults.
-_DEFAULT_MAX_TRANSFER = ByteSize(100 * _MB)
-_DEFAULT_MAX_MEMORY = ByteSize(512 * _MB)
-_DEFAULT_MAX_DOWNLOAD = ByteSize(500 * _MB)
-_DEFAULT_CONFIRM_ABOVE = ByteSize(25 * _MB)
+_DEFAULT_MAX_TRANSFER = ByteSize(CONFIG.max_transfer_mb * MB)
+_DEFAULT_MAX_MEMORY = ByteSize(CONFIG.max_memory_mb * MB)
+_DEFAULT_MAX_DOWNLOAD = ByteSize(CONFIG.max_download_mb * MB)
+_DEFAULT_CONFIRM_ABOVE = ByteSize(CONFIG.confirm_above_mb * MB)
 
 # Only approve() may construct an ApprovedRead. Hand-construction needs this
-# object, which is not exported, so bypassing the gate is deliberate, not casual.
+# unexported object, so bypassing the gate is deliberate.
 _GATE_TOKEN = object()
 
 
@@ -170,7 +170,7 @@ def _cause(plan: ReadPlan) -> str:
         parts.append(str(arr.storage.compression))
     tail = ""
     if plan.amplification >= 10:
-        tail = f"; slice costs {plan.transferred} at {plan.amplification:.0f}x amplification"
+        tail = f", slice costs {plan.transferred} at {plan.amplification:.0f}x amplification"
     return ", ".join(parts) + tail
 
 
@@ -189,7 +189,113 @@ def _alternatives(plan: ReadPlan) -> tuple[str, ...]:
     """
     path = plan.node.path
     return (
-        f"mer explore stats <uri> --path {path}                # sampled, reports sample_fraction",
-        f"mer explore head  <uri> --path {path} -n 5           # first rows only",
-        f"mer explore stats <uri> --path {path} --exact --max-transfer-mb 5000",
+        f"mer explore <uri> --stats --path {path}              # sampled, reports sample_fraction",
+        f"mer explore <uri> --head  --path {path} -n 5         # first rows only",
+        f"mer explore <uri> --stats --path {path} --exact --max-transfer-mb 5000",
+    )
+
+
+def build_policy(
+    *,
+    max_transfer_mb: float | None = None,
+    max_memory_mb: float | None = None,
+    max_download_mb: float | None = None,
+    assume_yes: bool = False,
+    dry_run: bool = False,
+    config_file: Path | None = None,
+) -> TransferPolicy:
+    """Build a policy from config-file defaults with CLI overrides on top.
+
+    Parameters
+    ----------
+    max_transfer_mb, max_memory_mb, max_download_mb : float, optional
+        Ceilings in megabytes; override the config file when given.
+    assume_yes : bool
+        Skip prompts.
+    dry_run : bool
+        Estimate and stop.
+    config_file : Path, optional
+        TOML file with an ``[explore]`` table. Defaults to the settings file
+        under the user's home.
+
+    Returns
+    -------
+    TransferPolicy
+        The resolved policy.
+    """
+    base = _policy_from_config(config_file)
+
+    def size(mb: float | None, fallback: ByteSize) -> ByteSize:
+        """Convert a megabyte override to a size, keeping the fallback when unset.
+
+        Parameters
+        ----------
+        mb : float or None
+            Ceiling in megabytes, or nothing.
+        fallback : ByteSize
+            Value to keep when no override is given.
+
+        Returns
+        -------
+        ByteSize
+            The chosen size.
+        """
+        return ByteSize(int(mb * MB)) if mb else fallback
+
+    return TransferPolicy(
+        max_transfer=size(max_transfer_mb, base.max_transfer),
+        max_memory=size(max_memory_mb, base.max_memory),
+        max_download=size(max_download_mb, base.max_download),
+        confirm_above=base.confirm_above,
+        assume_yes=assume_yes or base.assume_yes,
+        dry_run=dry_run,
+    )
+
+
+def _policy_from_config(config_file: Path | None) -> TransferPolicy:
+    """Read policy defaults from the ``[explore]`` table of a TOML file.
+
+    Parameters
+    ----------
+    config_file : Path or None
+        File to read. Defaults to the settings file under the user's home.
+
+    Returns
+    -------
+    TransferPolicy
+        Built-in defaults with values from the file applied on top.
+    """
+    path = config_file or CONFIG.settings_path()
+    if not path.exists():
+        return TransferPolicy()
+    try:
+        import tomllib
+    except ImportError:
+        import tomli as tomllib  # type: ignore[no-redef]
+    with open(path, "rb") as f:
+        data = tomllib.load(f).get("explore", {})
+    default = TransferPolicy()
+
+    def size(key: str, fallback: ByteSize) -> ByteSize:
+        """Look up a megabyte setting by key, keeping the fallback when absent.
+
+        Parameters
+        ----------
+        key : str
+            Name of the setting in the table.
+        fallback : ByteSize
+            Value to keep when the key is absent.
+
+        Returns
+        -------
+        ByteSize
+            The chosen size.
+        """
+        return ByteSize(int(data[key] * MB)) if key in data else fallback
+
+    return TransferPolicy(
+        max_transfer=size("max_transfer_mb", default.max_transfer),
+        max_memory=size("max_memory_mb", default.max_memory),
+        max_download=size("max_download_mb", default.max_download),
+        confirm_above=size("confirm_above_mb", default.confirm_above),
     )

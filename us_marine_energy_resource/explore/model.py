@@ -19,7 +19,8 @@ Decode = Literal["none", "cf", "rex"]
 # references to these types at the boundary, so json.dumps needs no encoder.
 AttrValue = str | int | float | bool | None | list["AttrValue"] | dict[str, "AttrValue"]
 
-_MB = 1024 * 1024
+# One megabyte in bytes, defined once next to ByteSize.
+MB = 1024 * 1024
 
 
 @dataclasses.dataclass(frozen=True)

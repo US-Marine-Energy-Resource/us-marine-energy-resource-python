@@ -14,7 +14,6 @@ from typing import BinaryIO
 from urllib.parse import urlparse
 
 from .blockio import BlockCachedReader
-from .budget import ApprovedRead
 from .errors import SourceError
 from .lazy import lazy_import
 from .model import ByteSize, SourceRef
@@ -245,7 +244,7 @@ class HttpSource:
         """
         if not self._accept_ranges or self.ref.size is None:
             raise SourceError(
-                f"{self._url} does not support range requests; a full download is required"
+                f"{self._url} does not support range requests. A full download is required"
             )
         requests = lazy_import("requests", "reading files over HTTP(S)")
 
@@ -292,10 +291,6 @@ class HttpSource:
         resp = requests.get(self._url, headers={"Range": f"bytes=0-{n - 1}"}, timeout=30)
         resp.raise_for_status()
         return resp.content
-
-    def materialize(self, approved: ApprovedRead) -> Path:
-        """Download the whole file to a temp file and return its path."""
-        raise SourceError("download over HTTP(S) is not implemented yet")
 
 
 def resolve_source(uri: str, aws_profile: str | None = None) -> LocalSource | S3Source | HttpSource:

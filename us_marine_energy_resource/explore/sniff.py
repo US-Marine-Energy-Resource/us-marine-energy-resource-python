@@ -35,5 +35,5 @@ def sniff_format(head: bytes) -> Format:
     if head.startswith(_PARQUET_MAGIC):
         return "parquet"
     if head.startswith(_NETCDF3_MAGIC):
-        raise UnsupportedFormatError("netCDF-3 classic; mer reads netCDF-4/HDF5 and parquet")
+        raise UnsupportedFormatError("netCDF-3 classic. mer reads netCDF-4/HDF5 and parquet")
     raise UnknownFormatError(f"unrecognized file header: {head[:8]!r}")

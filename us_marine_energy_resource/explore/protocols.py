@@ -9,7 +9,6 @@ implements the same way.
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from pathlib import Path
 from typing import BinaryIO, Protocol, runtime_checkable
 
 from .budget import ApprovedRead, ReadPlan

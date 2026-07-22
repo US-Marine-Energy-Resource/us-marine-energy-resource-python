@@ -32,19 +32,13 @@ from ..model import (
     StorageInfo,
 )
 from ..selection import FirstN, Selection, resolve
-
-_HDF5_MAGIC = b"\x89HDF\r\n\x1a\n"
+from ._stats import summarize
 
 
 class Hdf5Backend:
     """Open HDF5 and netCDF-4 files."""
 
     format = "hdf5"
-
-    @staticmethod
-    def sniff(head: bytes) -> bool:
-        """Return whether the leading bytes are the HDF5 magic."""
-        return head.startswith(_HDF5_MAGIC)
 
     @contextmanager
     def open(self, handle: BinaryIO, ref: SourceRef) -> Iterator[Hdf5OpenFile]:
@@ -574,7 +568,7 @@ class Hdf5OpenFile:
         notes: list[str] = []
         if sf is not None:
             notes.append(
-                f"raw values; unapplied scale_factor={float(sf)}"
+                f"raw values, unapplied scale_factor={float(sf)}"
                 + (f", add_offset={float(offset)}" if offset is not None else "")
                 + " (use --decode cf or --decode rex)"
             )
@@ -612,7 +606,7 @@ class Hdf5OpenFile:
             method = "chunk-strided"
 
         read = int(data.size)
-        return _summarize(np, data, node.path, total, read, method, spec)
+        return summarize(np, data, node.path, total, read, method, spec)
 
     def _strided_sample(self, dset: Any, spec: StatsSpec) -> Any:
         """Read evenly spaced axis-0 blocks until the element budget is met.
@@ -703,41 +697,3 @@ def _bytes_to_str(obj: Any) -> AttrValue:
     if isinstance(obj, list):
         return [_bytes_to_str(x) for x in obj]
     return obj
-
-
-def _summarize(
-    np: Any, data: Any, path: NodePath, total: int, read: int, method: str, spec: StatsSpec
-) -> StatsResult:
-    """Reduce sampled data to a StatsResult with honest coverage fields."""
-    numeric = data.dtype.kind in "iufc"
-    sampled = read < total
-    fraction = (read / total) if total else 1.0
-    if not numeric or read == 0:
-        return StatsResult(
-            path=path,
-            count=read,
-            n_nan=0,
-            mean=None,
-            std=None,
-            min=None,
-            max=None,
-            sampled=sampled,
-            sample_fraction=fraction,
-            sample_method=method,  # type: ignore[arg-type]
-        )
-    flat = data.astype("float64").ravel()
-    n_nan = int(np.isnan(flat).sum())
-    clean = flat[~np.isnan(flat)] if spec.nan_policy == "omit" else flat
-    has = clean.size > 0
-    return StatsResult(
-        path=path,
-        count=read,
-        n_nan=n_nan,
-        mean=float(np.mean(clean)) if has else None,
-        std=float(np.std(clean)) if has else None,
-        min=float(np.min(clean)) if has else None,
-        max=float(np.max(clean)) if has else None,
-        sampled=sampled,
-        sample_fraction=fraction,
-        sample_method=method,  # type: ignore[arg-type]
-    )

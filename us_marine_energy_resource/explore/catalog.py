@@ -16,14 +16,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Protocol
 
+from .config import CONFIG
+
 # Endpoint name -> (bucket, root prefix). The wave root is the bucket itself.
-ENDPOINTS: dict[str, tuple[str, str]] = {
-    "tidal": ("marine-energy-data", "us-tidal/"),
-    "wave": ("wpto-pds-us-wave", ""),
-}
+ENDPOINTS: dict[str, tuple[str, str]] = CONFIG.endpoints
 
 # Extensions that mark a path as a file rather than a directory prefix.
-_DATA_EXTS = (".h5", ".hdf5", ".nc", ".nc4", ".parquet", ".pq")
+_DATA_EXTS = CONFIG.data_extensions
 
 _MAX_PAGES = 5  # hard bound on S3 round-trips per level, even with a narrow filter
 
