@@ -10,6 +10,7 @@ import typer.rich_utils
 
 from ._display import console, error
 from ._geometry import parse_bbox, parse_geojson_file, parse_point, parse_wkt
+from ._links import DATASET_CITATION, DOCS, GEOJSON_TOOL, S3_BROWSER, _link
 from ._options import (
     AwsProfileOpt,
     CacheDirOpt,
@@ -33,7 +34,6 @@ from ._options import (
     QueryOptions,
     UseHpcOpt,
 )
-from ._links import DATASET_CITATION, DOCS, GEOJSON_TOOL, S3_BROWSER, _link
 from ._run import run_multi, run_point
 
 # Blank out Typer's default help-text styling and pin its help colors to the
@@ -58,7 +58,7 @@ typer.rich_utils.STYLE_ABORTED = "bright_blue"
 
 _MAIN_HELP = (
     "Query and download modeled tidal current data from the U.S. DOE H2O High"
-    " Resolution Tidal Hindcast — FVCOM simulations covering five U.S. coastal"
+    " Resolution Tidal Hindcast, FVCOM simulations covering five U.S. coastal"
     " regions: Cook Inlet AK, Aleutian Islands AK, Salish Sea WA,"
     " Piscataqua River NH, and Western Passage ME.\n\n"
     "A point query returns the mesh face containing the coordinate."
@@ -75,42 +75,30 @@ _MAIN_HELP = (
     " [bright_blue]--file[/],\nor [bright_blue]--wkt[/] for area queries."
 )
 
-app = typer.Typer(
-    name="us-tidal",
-    help=(
-        "Query and download modeled tidal current data from the U.S. DOE H2O High"
-        " Resolution Tidal Hindcast — speed, direction, and power density at 10"
-        " depth layers for five U.S. coastal regions."
-    ),
+tidal_app = typer.Typer(
+    name="tidal",
     rich_markup_mode="rich",
     no_args_is_help=True,
     pretty_exceptions_show_locals=False,
     add_completion=True,
 )
 
-
-@app.command(
-    help=_MAIN_HELP,
-    epilog=(
-        "[bold]Examples[/bold]\n\n"
-        "us-tidal 60.73,-151.43                              Point query\n\n"
-        "us-tidal --coord 60.7,-151.4 --coord 60.9,-151.2   Transect\n\n"
-        "us-tidal --bbox 60.7,-151.5,60.9,-151.2            Bounding box\n\n"
-        "us-tidal --file study_area.geojson                  Polygon from file\n\n"
-        'us-tidal --wkt "POLYGON((-151.5 60.7,...))"         Polygon from WKT\n\n'
-        "us-tidal 60.73,-151.43 --dry-run                    Size estimate\n\n"
-        "us-tidal 60.73,-151.43 --info                       Dataset info (no download)\n\n"
-        "us-tidal 60.73,-151.43 --info-speed                 Speed category only\n\n"
-        "us-tidal 60.73,-151.43 --info --layer 3             Layer 3 stats\n\n"
-        "us-tidal 60.73,-151.43 --info --depth 15.0          Layer nearest 15 m\n\n"
-        "us-tidal 60.73,-151.43 --info --depth-avg           Average all layers\n\n"
-        "us-tidal --bbox 60.7,-151.5,60.9,-151.2 --info      Aggregate area info\n\n"
-        "us-tidal 60.73,-151.43 --output-dir ./data          Save parquet files\n\n"
-        "us-tidal 60.73,-151.43 --csv                        Export CSV to current dir\n\n"
-        "us-tidal 60.73,-151.43 --csv --output-dir ./data    Export CSV to ./data\n\n"
-        "Config file ([italic]~/.us_tidal.toml[/italic]) sets defaults for AWS, cache, and HPC options."
-    ),
+_TIDAL_EPILOG = (
+    "[bright_blue]Examples[/bright_blue]\n\n"
+    "mer tidal 60.73,-151.43                              Point query\n\n"
+    "mer tidal --coord 60.7,-151.4 --coord 60.9,-151.2   Transect\n\n"
+    "mer tidal --bbox 60.7,-151.5,60.9,-151.2            Bounding box\n\n"
+    "mer tidal --file study_area.geojson                  Polygon from file\n\n"
+    'mer tidal --wkt "POLYGON((-151.5 60.7,...))"         Polygon from WKT\n\n'
+    "mer tidal 60.73,-151.43 --dry-run                    Size estimate\n\n"
+    "mer tidal 60.73,-151.43 --info                       Dataset info (no download)\n\n"
+    "mer tidal 60.73,-151.43 --info --layer 3             Layer 3 stats\n\n"
+    "mer tidal 60.73,-151.43 --output-dir ./data          Save parquet files\n\n"
+    "mer tidal 60.73,-151.43 --csv                        Export CSV to current dir\n\n"
+    "Config file ([italic]~/.us_tidal.toml[/italic]) sets defaults for AWS, cache, and HPC options."
 )
+
+
 def main(
     # ----- Geometry (exactly one required) -----
     location: Annotated[
@@ -166,6 +154,7 @@ def main(
     hpc_base_path: HpcBasePathOpt = None,
     clear_cache: ClearCacheOpt = False,
 ) -> None:
+    """Query the tidal hindcast for one geometry and print or download the result."""
     # -- validate geometry (exactly one active) --
     geometry_sources = {
         "lat,lon (positional)": location is not None,
