@@ -144,6 +144,8 @@ ignore = [
     "D100", # Missing docstring in public module — file-level docstrings used instead
     "D104", # Missing docstring in public package
 ]
+# Math notation used intentionally in docstrings (sigma layers, tidal formulas).
+allowed-confusables = ["σ", "ζ", "×", "−", "–"]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
