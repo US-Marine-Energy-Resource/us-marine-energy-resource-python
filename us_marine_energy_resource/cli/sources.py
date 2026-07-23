@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..wave_hindcast.config import CONFIG as _WAVE_CONFIG
 from ._display import console
 from ._links import _link
 
@@ -21,8 +22,8 @@ _SOURCES: tuple[dict[str, str], ...] = (
         "name": "wave",
         "title": "U.S. DOE H2O High-Resolution Wave Hindcast",
         "submission": "https://mhkdr.openei.org/submissions/326",
-        "browser": "https://data.openei.org/s3_viewer?bucket=wpto-pds-us-wave",
-        "s3": "s3://wpto-pds-us-wave/",
+        "browser": f"https://data.openei.org/s3_viewer?bucket={_WAVE_CONFIG.s3_bucket}",
+        "s3": f"{_WAVE_CONFIG.s3_bucket_uri}/",
     },
 )
 
