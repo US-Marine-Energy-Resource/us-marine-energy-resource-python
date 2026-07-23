@@ -122,7 +122,7 @@ def test_default_name_from_coordinates(
 def test_api_outage_blocks_fetch(
     wave_index_dir: Path, fake_backend: FakeBackend, cache: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A domain in API_OUTAGES fails fast instead of waiting out the poll."""
+    """An explicit api fetch on a domain in API_OUTAGES fails fast."""
     broken = WaveNode(
         location_id=7,
         domain="Gulf_of_Mexico_and_Puerto_Rico",
@@ -135,7 +135,7 @@ def test_api_outage_blocks_fetch(
         "us_marine_energy_resource.wave_hindcast.nodes.nearest", lambda *args, **kwargs: broken
     )
     with pytest.raises(errors.ApiOutageError) as excinfo:
-        hindcast.get_data_at_point(18.6, -66.1, name="pr")
+        hindcast.get_data_at_point(18.6, -66.1, name="pr", backend="api")
     assert excinfo.value.domain == "Gulf_of_Mexico_and_Puerto_Rico"
     assert fake_backend.fetches == []
 
@@ -222,3 +222,62 @@ def test_unknown_backend_raises() -> None:
     """An unknown backend name fails with the available options listed."""
     with pytest.raises(ValueError, match="api"):
         backend_mod.get_backend("hsds")
+
+
+def test_resolve_backend_passthrough() -> None:
+    """Explicit names resolve to themselves with no explanation."""
+    assert backend_mod.resolve_backend("api", "West_Coast") == ("api", None)
+    assert backend_mod.resolve_backend("s3", "West_Coast") == ("s3", None)
+
+
+def test_resolve_backend_small_query_reads_s3() -> None:
+    """At or under the seam, auto reads S3 with no key involved."""
+    name, reason = backend_mod.resolve_backend(
+        "auto", "West_Coast", years=[2020], variables=["a", "b", "c", "d"]
+    )
+    assert name == "s3" and reason is None
+
+
+def test_resolve_backend_large_query_uses_api_with_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Past the seam, auto hands the query to the api when a key exists."""
+    monkeypatch.setattr(
+        "us_marine_energy_resource.wave_hindcast.nlr_api.client.has_credentials", lambda: True
+    )
+    name, reason = backend_mod.resolve_backend(
+        "auto", "West_Coast", years=list(range(2011, 2021)), variables=["a", "b", "c", "d"]
+    )
+    assert name == "api" and reason is not None
+
+
+def test_resolve_backend_large_query_stays_on_s3_without_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Past the seam with no key, auto stays on S3 and says why."""
+    monkeypatch.setattr(
+        "us_marine_energy_resource.wave_hindcast.nlr_api.client.has_credentials", lambda: False
+    )
+    name, reason = backend_mod.resolve_backend(
+        "auto", "West_Coast", years=list(range(2011, 2021)), variables=["a", "b", "c", "d"]
+    )
+    assert name == "s3" and reason is not None and "key" in reason
+
+
+def test_resolve_backend_outage_domain_reads_s3() -> None:
+    """A large query on a domain with a broken API reads S3."""
+    name, reason = backend_mod.resolve_backend(
+        "auto",
+        "Gulf_of_Mexico_and_Puerto_Rico",
+        years=list(range(2011, 2021)),
+        variables=["a", "b", "c", "d"],
+    )
+    assert name == "s3" and reason is not None and "not working" in reason
+
+
+def test_resolve_backend_api_capped_years_read_s3() -> None:
+    """Years past the api's cap for a domain read S3, key or no key."""
+    name, reason = backend_mod.resolve_backend(
+        "auto", "Atlantic", years=list(range(2011, 2021)), variables=["a", "b", "c", "d"]
+    )
+    assert name == "s3" and reason is not None and "2010" in reason

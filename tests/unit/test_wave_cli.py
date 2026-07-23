@@ -95,7 +95,7 @@ def test_dry_run_sends_nothing(described: dict[str, Any], monkeypatch: pytest.Mo
 def test_missing_credentials_fail_before_confirm(
     described: dict[str, Any], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """A fetch without credentials errors up front, pointing at --info."""
+    """An explicit api fetch without credentials errors up front."""
     monkeypatch.setenv("MER_WAVE_CACHE_DIR", str(tmp_path))
     monkeypatch.delenv("NLR_DEVELOPER_API_KEY", raising=False)
     monkeypatch.delenv("NLR_DEVELOPER_EMAIL", raising=False)
@@ -104,9 +104,11 @@ def test_missing_credentials_fail_before_confirm(
     empty.mkdir()
     monkeypatch.chdir(empty)
     monkeypatch.setattr(Path, "home", staticmethod(lambda: empty))
-    result = runner.invoke(app, ["wave", PACWAVE_ARG, "--yes"])
+    result = runner.invoke(app, ["wave", PACWAVE_ARG, "--backend", "api", "--yes"])
     assert result.exit_code == 1
     assert "NLR_DEVELOPER_API_KEY" in result.output
+    # The error points at the keyless alternative.
+    assert "--backend s3" in " ".join(result.output.split())
 
 
 def test_confirmation_declined_aborts(
@@ -125,7 +127,7 @@ def test_confirmation_declined_aborts(
         raise AssertionError("declined confirm must not fetch")
 
     monkeypatch.setattr("us_marine_energy_resource.cli.wave.hindcast.get_data_at_point", boom)
-    result = runner.invoke(app, ["wave", PACWAVE_ARG], input="n\n")
+    result = runner.invoke(app, ["wave", PACWAVE_ARG, "--backend", "api"], input="n\n")
     assert result.exit_code == 0
     # The confirmation names the server, the email, both destinations, and
     # the volume, which defaults to the most recent year.
@@ -136,7 +138,8 @@ def test_confirmation_declined_aborts(
     collapsed = " ".join(result.output.split())
     squeezed = collapsed.replace(" ", "")
     assert "Saves to" in collapsed and "point_44.5670_m124.2290_y2020-2020.csv" in squeezed
-    assert "Cached at" in collapsed and f"{tmp_path.name}/point_44.5670_m124.2290_y2020" in squeezed
+    assert "Cached at" in collapsed and tmp_path.name in squeezed
+    assert "underthenamepoint_44.5670_m124.2290_y2020-2020" in squeezed
 
 
 def test_fetch_with_yes_saves_csv_by_default(
@@ -206,7 +209,9 @@ def test_defaults_narrow_to_latest_year_and_key_variables(
     # The user is told what was held back and how to get more.
     collapsed = " ".join(result.output.split())
     assert "only 2020 out of the served 1979-2020" in collapsed
-    assert "--years" in collapsed and "--all" in collapsed and "--backend s3" in collapsed
+    assert "--years" in collapsed and "--all" in collapsed
+    # A small default query resolves to the keyless s3 backend.
+    assert calls[0]["backend"] == "s3"
 
 
 def test_all_fetches_everything_with_a_disclaimer(
@@ -231,6 +236,8 @@ def test_all_fetches_everything_with_a_disclaimer(
     assert result.exit_code == 0
     assert calls[0]["years"] is None and calls[0]["variables"] is None
     assert "everything the endpoint serves" in " ".join(result.output.split())
+    # A large query with credentials configured resolves to the api backend.
+    assert calls[0]["backend"] == "api"
 
 
 def test_all_conflicts_with_narrowing(described: dict[str, Any]) -> None:
@@ -481,3 +488,86 @@ def test_outage_warning_shown(monkeypatch: pytest.MonkeyPatch) -> None:
     result = runner.invoke(app, ["wave", "18.6,-66.1", "--info"])
     assert result.exit_code == 0
     assert "not working" in result.output
+
+
+def test_help_builders_are_total() -> None:
+    """The prose helpers handle every input size without raising."""
+    from us_marine_energy_resource.cli.wave import _count_word, _prose_list
+
+    assert _prose_list([]) == ""
+    assert _prose_list(["a"]) == "a"
+    assert _prose_list(["a", "b"]) == "a and b"
+    assert _prose_list(["a", "b", "c"]) == "a, b, and c"
+    assert _count_word(4) == "four"
+    assert _count_word(6) == "six"
+    assert _count_word(99) == "99"
+    assert _count_word(-1) == "-1"
+
+
+def test_wave_help_derives_from_canonical_sources() -> None:
+    """Every enumerable fact in the help comes from the defining modules."""
+    from us_marine_energy_resource.cli.wave import _WAVE_EPILOG, _WAVE_HELP
+    from us_marine_energy_resource.wave_hindcast.config import CONFIG
+    from us_marine_energy_resource.wave_hindcast.domains import BASE_DOMAIN, DOMAINS
+
+    for region in DOMAINS:
+        assert region.replace("_", " ") in _WAVE_HELP
+    assert f"{BASE_DOMAIN['first_year']}-{BASE_DOMAIN['last_year']}" in _WAVE_HELP
+    assert CONFIG.api_key_env in _WAVE_HELP
+    assert CONFIG.email_env in _WAVE_HELP
+    assert CONFIG.s3_bucket_uri in _WAVE_HELP
+    # The epilog's cache example names what a default fetch really creates.
+    last = BASE_DOMAIN["last_year"]
+    assert f"point_44.5700_m124.2300_y{last}-{last}" in _WAVE_EPILOG
+
+
+def test_wave_help_builder_handles_domain_variants() -> None:
+    """The builder stays total for edge-case domain tables."""
+    from us_marine_energy_resource.cli.wave import _build_wave_help
+
+    base = {"first_year": 1979, "last_year": 2020}
+    uncapped = {"One": {}, "Two": {}}
+    text = _build_wave_help(uncapped, base)
+    assert "One and Two" in text and "only through" not in text
+
+    capped = {"One": {}, "Two": {"last_year": 2010}}
+    text = _build_wave_help(capped, base)
+    assert "serves Two only through 2010" in text
+
+    single = {"One": {}}
+    assert "one region:" in _build_wave_help(single, base)
+
+
+def test_wave_help_renders() -> None:
+    """mer wave --help renders the interpolated help without error."""
+    result = runner.invoke(app, ["wave", "--help"])
+    assert result.exit_code == 0
+    assert "WPTO" in result.output
+
+
+def test_small_default_query_uses_s3_without_credentials(
+    described: dict[str, Any], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A bare small query reads S3 and never asks for a key."""
+    import pandas as pd
+
+    monkeypatch.setenv("MER_WAVE_CACHE_DIR", str(tmp_path))
+    monkeypatch.delenv("NLR_DEVELOPER_API_KEY", raising=False)
+    monkeypatch.delenv("NLR_DEVELOPER_EMAIL", raising=False)
+    # Keep the developer's own .env / ~/.mer.env out of the test.
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    monkeypatch.chdir(empty)
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: empty))
+
+    calls: list[dict[str, Any]] = []
+
+    def fake_get(lat: float, lon: float, **kwargs: Any) -> tuple[pd.DataFrame, dict[str, Any]]:
+        calls.append(kwargs)
+        return pd.DataFrame({"x": [1.0]}), {"site": "s", "years": ["2020", "2020"], "variables": []}
+
+    monkeypatch.setattr("us_marine_energy_resource.cli.wave.hindcast.get_data_at_point", fake_get)
+    result = runner.invoke(app, ["wave", PACWAVE_ARG, "--yes", "--cache-only"])
+    assert result.exit_code == 0
+    assert calls[0]["backend"] == "s3"
+    assert "No API and no key" in " ".join(result.output.split())
