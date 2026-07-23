@@ -2,6 +2,7 @@
 
 DATASET_CITATION = "https://mhkdr.openei.org/submissions/632"
 DOCS = "https://github.com/US-Marine-Energy-Resource/us-marine-energy-resource-python"
+ISSUES = f"{DOCS}/issues"
 S3_BROWSER = "https://data.openei.org/s3_viewer?bucket=marine-energy-data&prefix=us-tidal%2F"
 GEOJSON_TOOL = "https://geojson.io/next/"
 

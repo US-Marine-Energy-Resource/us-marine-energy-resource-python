@@ -18,6 +18,9 @@ venv/
 env/
 .env/
 
+# Credential env files (mer wave API keys)
+.env
+
 # UV
 uv.lock
 

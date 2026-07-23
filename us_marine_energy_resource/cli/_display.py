@@ -3,20 +3,49 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
-
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rich import box
 from rich.console import Console
+from rich.highlighter import NullHighlighter
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
+from rich.theme import Theme
 
 if TYPE_CHECKING:
     import pandas as pd
 
-console = Console()
+# The CLI palette: white, blue, and green, with bold only on blue and green.
+# Blue is the bright variant because standard ANSI blue is nearly unreadable
+# on dark terminals. Rich's defaults color paths magenta, progress bars pink,
+# and table headers bold white, so every default style that can show up in
+# our output is pinned to the palette here.
+# tests/unit/test_cli_palette.py checks rendered output against this rule.
+PALETTE = Theme(
+    {
+        "rule.line": "bright_blue",
+        "bar.complete": "bright_blue",
+        "bar.finished": "green",
+        "bar.pulse": "bright_blue",
+        "progress.percentage": "green",
+        "progress.download": "green",
+        "progress.data.speed": "bright_blue",
+        "progress.remaining": "bright_blue",
+        "progress.elapsed": "bright_blue",
+        "progress.spinner": "green",
+        "status.spinner": "green",
+        "table.header": "bright_blue",
+        "table.footer": "bright_blue",
+        "prompt.choices": "green",
+        "prompt.default": "bright_blue",
+    }
+)
+
+# No automatic highlighting: rich would otherwise color every number, path,
+# and date inside prose, which turns a plain sentence into a patchwork.
+# Color appears only where a style is set deliberately.
+console = Console(theme=PALETTE, highlighter=NullHighlighter())
 
 
 def _df_to_rich_table(
@@ -32,7 +61,7 @@ def _df_to_rich_table(
         title=title or None,
         box=box.SIMPLE,
         show_header=True,
-        header_style="bold",
+        header_style="bright_blue",
         padding=(0, 1),
     )
     for col in df.columns:
@@ -47,14 +76,12 @@ def header(title: str, subtitle: str = "") -> None:
     """Print a header panel for a query."""
     body = Text(subtitle, style="dim") if subtitle else Text("")
     console.print(
-        Panel(body, title=f"[bold cyan]us-tidal[/] · {title}", box=box.ROUNDED, expand=False)
+        Panel(body, title=f"[bold bright_blue]us-tidal[/] · {title}", box=box.ROUNDED, expand=False)
     )
 
 
 def point_result(result: dict[str, Any]) -> None:
     """Print metadata for a single-point query result."""
-    import pandas as pd
-
     from ._links import _link, http_url, s3_uri
 
     p = result["point"]
@@ -86,7 +113,7 @@ def faces_table(results: list[dict[str, Any]], max_rows: int = 20) -> None:
     import pandas as pd
 
     locations = sorted({r.get("location", "?") for r in results})
-    loc_str = "  ·  ".join(f"[cyan]{loc}[/]" for loc in locations)
+    loc_str = "  ·  ".join(f"[bright_blue]{loc}[/]" for loc in locations)
     console.print(f"\n  Matched [bold green]{len(results):,}[/] faces  ·  {loc_str}")
 
     rows = []
@@ -176,13 +203,13 @@ def cache_location(cache_dir: Path, n_files: int) -> None:
     """Print a summary line showing where files were cached."""
     console.print(
         f"\n  [bold green]✓[/]  {n_files} file{'s' if n_files != 1 else ''} "
-        f"cached at [cyan]{cache_dir}[/]"
+        f"cached at [bright_blue]{cache_dir}[/]"
     )
 
 
 def error(msg: str) -> None:
     """Print a formatted error message."""
-    console.print(f"[bold red]Error:[/] {msg}")
+    console.print(f"[bold bright_blue]Error:[/] {msg}")
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +244,9 @@ def _render_file_meta(
     if n_files > 1:
         table.add_row("matched files", str(n_files))
     table.add_row("total rows", f"{total_rows:,}")
-    console.print(Panel(table, title="[bold]Dataset Metadata[/]", box=box.ROUNDED, expand=False))
+    console.print(
+        Panel(table, title="[bright_blue]Dataset Metadata[/]", box=box.ROUNDED, expand=False)
+    )
 
 
 def _render_schema_table(categories: list[Any]) -> None:
