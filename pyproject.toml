@@ -58,6 +58,7 @@ dependencies = [
     "utide>=0.3",
     "typer>=0.9",
     "click>=8.1",
+    "rich>=13",
     "pyproj>=3.6",
     "tomli>=2.0; python_version < '3.11'",
 ]
