@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "us-marine-energy-resource"
-version = "0.4.0"
-description = "Download, visualize, and analyze the U.S. DOE Hydropower and Hydrokinetic Office (H2O) High Resolution Tidal Hindcast dataset"
+version = "0.5.0"
+description = "Download, visualize, and analyze U.S. DOE marine energy resource data, including the H2O High Resolution Tidal Hindcast and the WPTO High-Resolution Wave Hindcast"
 authors = [
   {name = "Andrew Simms", email = "andrew.simms@nlr.gov"},
 ]
@@ -17,11 +17,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 keywords = [
     "tidal energy",
+    "wave energy",
     "marine energy",
     "ocean current",
     "hydrokinetic",
     "hindcast",
-    "renewable energy",
     "H2O",
     "DOE",
 ]
