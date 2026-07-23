@@ -2,7 +2,8 @@
 
 Maintainer tool, not part of the runtime path. It reads the ``coordinates``
 dataset out of each published domain's .h5 on S3 and writes one parquet per
-domain into ``data/wave_index/v1/`` (Git LFS), plus the small in-package files
+domain into ``data/h2o_wave_hindcast_index/v1/`` (Git LFS), plus the small
+in-package files
 under ``us_marine_energy_resource/data/``: the occupancy-cell domain gate, the
 coverage footprints, the SHA256 registry, and the index JSON.
 
@@ -45,9 +46,9 @@ from us_marine_energy_resource.wave_hindcast.domains import (  # noqa: E402
     DOMAINS,
     SITES,
 )
-from us_marine_energy_resource.wave_hindcast.index import INDEX_VERSION  # noqa: E402
+INDEX_VERSION = CONFIG.index_version
 
-LFS_DIR = REPO_ROOT / "data" / "wave_index" / INDEX_VERSION
+LFS_DIR = REPO_ROOT / "data" / CONFIG.index_subdir
 PKG_DATA = REPO_ROOT / "us_marine_energy_resource" / "data"
 
 COORD_SCALE = index_build.COORD_SCALE
@@ -214,7 +215,7 @@ def write_registry() -> None:
     for path in sorted(LFS_DIR.glob("*.parquet")):
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         lines.append(f"{path.name}  sha256:{digest}")
-    out = PKG_DATA / f"wave_index_registry_{INDEX_VERSION}.txt"
+    out = CONFIG.index_registry_file
     out.write_text("\n".join(lines) + "\n")
     print(f"  wrote {out.name}  ({len(lines) - 1} files)")
 
@@ -259,7 +260,7 @@ def main() -> None:
         con = duckdb.connect()
         con.execute("INSTALL spatial; LOAD spatial;")
 
-        index_path = PKG_DATA / f"wave_index_{INDEX_VERSION}.json"
+        index_path = CONFIG.index_file
         index = json.loads(index_path.read_text()) if index_path.exists() else {}
         bounds = {b["domain"]: b for b in index.get("bounds", [])}
 
