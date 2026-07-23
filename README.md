@@ -6,6 +6,7 @@
 - [Tidal Quick Start](#tidal-quick-start)
 - [Dataset Variables](#dataset-variables)
 - [Multi-Site Comparison](#multi-site-comparison)
+- [Wave Hindcast](#wave-hindcast)
 - [Command Line Interface](#command-line-interface)
 - [Direct Downloads using the `tidal_hindcast`
   API](#direct-downloads-using-the-tidal_hindcast-api)
@@ -29,14 +30,13 @@ coastal regions, generated with the [Finite Volume Community Ocean Model
 
 > [!NOTE]
 >
-> At this time this libary does not provide support for the U.S. DOE H20
-> wave energy hindcast dataset. The marine and hydrokinetic toolkit
-> (MHKiT) can access using the `wave.io.hindcast` module showcased in
-> this [wave hindcast
-> example](https://mhkit-software.github.io/MHKiT/WPTO_hindcast_example.html)
-> that leverages the [NLR Resource eXtraction tool
-> (rex)](https://github.com/NatLabRockies/rex) to access wave hindcast
-> data.
+> This library also provides point access to the U.S. DOE WPTO
+> High-Resolution Wave Hindcast dataset through the `mer wave` command
+> and the `us_marine_energy_resource.wave_hindcast` module. See [Wave
+> Hindcast](#wave-hindcast) below. The marine and hydrokinetic toolkit
+> (MHKiT) offers another route through its `wave.io.hindcast` module,
+> shown in this [wave hindcast
+> example](https://mhkit-software.github.io/MHKiT/WPTO_hindcast_example.html).
 
 ## Installation
 
@@ -57,10 +57,10 @@ pip install us-marine-energy-resource
 ## Tidal Quick Start
 
 `us_marine_energy_resource.tidal_hindcast.get_data_at_point` takes a
-latitude and longitude as input and fetch a full year of tidal current
-data at US coastal coordinate within the 5 locations listed above and
-visualize current speed across all 10 depth layers over the entire
-hindcast year.
+latitude and longitude and fetches a full year of tidal current data at
+the nearest grid point within the five hindcast regions listed below.
+The plotting functions then visualize current speed across all 10 depth
+layers over the entire hindcast year.
 
 The dataset covers a full year at each region at hourly or half-hourly
 resolution across 10 terrain-following [sigma
@@ -92,13 +92,6 @@ lon=-151.431396
 location_name = "Cook Inlet, Near Nikiski, AK"
 
 df = tidal.get_data_at_point(lat=lat, lon=lon)
-```
-
-``` python
-_LOCAL = "docs/images"
-
-def img(filename: str) -> str:
-    return f"{_LOCAL}/{filename}"
 ```
 
 `us_marine_energy_resource` has functions to plot the point data at the
@@ -468,7 +461,7 @@ sites across the US.
 ### Site Definitions
 
 To start we define the coordinates and names of the tidal sites we want
-to compare and same them in a python dictionary.
+to compare and save them in a Python list.
 
 ``` python
 sites = [
@@ -647,22 +640,149 @@ tidal.plot_jpd_comparison_grid(
 ![Joint probability distribution grid, all six
 sites](https://raw.githubusercontent.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/main/docs/images/all-sites-jpd-grid.png)
 
-## Command Line Interface
+## Wave Hindcast
 
-Installing via uv or pip includes the `us-tidal` CLI for querying and
-downloading tidal hindcast data directly from the command line without
-Python.
+The library can also query the [U.S. DOE WPTO High-Resolution Wave
+Hindcast](https://registry.opendata.aws/wpto-pds-us-wave/) at a point.
+The dataset covers 1979-2020 in six regions: West Coast, Atlantic,
+Alaska, Hawaii, Gulf of Mexico and Puerto Rico, and CNMI and Guam.
 
-### Available options
+A query finds the hindcast grid node nearest the coordinate and fetches
+its record. The defaults are narrow so a first look is quick: four key
+variables for the most recent year, widened with `--years`,
+`--variables`, or `--all`. Two backends serve the data and the default
+picks between them by size. Small queries read straight from the
+published files on S3, which needs no key or account, and large queries
+switch to the NLR developer download API, which builds an archive server
+side. The result is cached locally, so repeat queries read from disk.
+
+Finding the node, describing a point, and small queries are free and
+need no account:
 
 ``` bash
-us-tidal --help
+mer wave 44.57,-124.23 --info      # node, domain, years. No download
+mer wave 44.57,-124.23             # shows its plan and asks first, no key needed
 ```
 
-    Usage: us-tidal [OPTIONS] [LOCATION]                                           
+Large (\> 3 years typically) queries are initially routed through the
+api backend and need a free API key from
+<https://developer.nlr.gov/signup/> in `NLR_DEVELOPER_API_KEY` and a
+contact email in `NLR_DEVELOPER_EMAIL`, and without a key they stay on
+S3 and take longer. Set them in the environment, in a `.env` file in the
+current directory, or in `~/.mer.env` to make them work in every
+directory:
+
+``` bash
+cat > ~/.mer.env <<EOF
+NLR_DEVELOPER_API_KEY=your_key
+NLR_DEVELOPER_EMAIL=you@example.org
+EOF
+```
+
+Download every variable and year at a single point, cli will ask for
+permission first
+
+``` bash
+mer wave 44.57,-124.23 --all
+```
+
+Download every variable and year at a single point without asking
+permission (can be scripted)
+
+``` bash
+mer wave 44.57,-124.23 --all -y
+```
+
+The result is saved as a CSV in the current directory (choose another
+with `-o DIR`, or keep it only in the cache with `--cache-only`), and
+every fetch is cached under `~/.mer_wave_cache` so repeat queries read
+from disk.
+
+The same query is available in Python:
+
+``` python
+from us_marine_energy_resource import wave_hindcast
+
+info = wave_hindcast.describe_point(44.567, -124.229)   # no download and no API key
+df = wave_hindcast.get_data_at_point(44.567, -124.229)  # blocks while the data downloads
+```
+
+`df` is indexed by UTC timestamp with one column per wave variable, and
+`df.attrs` carries the metadata: grid id, node position, and units, and
+the api backend also records the water depth. Directions come back in
+the meteorological convention for every region, including Hawaii, whose
+published values need a correction that is applied automatically.
+
+The raw ~80 GB yearly `.h5` files remain browsable with the generic file
+verbs (`mer ls wave`, `mer explore wave/v1.0.1/West_Coast`), and
+`mer download` can fetch them when the full files are really wanted.
+
+## Command Line Interface
+
+Installing via uv or pip includes the `mer` CLI for querying, exploring,
+and downloading marine energy data directly from the command line
+without Python. `mer tidal` queries and downloads the tidal hindcast,
+`mer wave` queries the wave hindcast (see [Wave
+Hindcast](#wave-hindcast) above), `mer sources` lists the underlying
+data sources, and the file verbs `ls`, `info`, `explore`, and `download`
+work on any dataset path, `s3://` prefix, or local file.
+
+``` bash
+mer --help
+```
+
+    Usage: mer [OPTIONS] COMMAND [ARGS]...                                         
+                                                                                    
+     U.S. marine energy resource (mer) tools for querying, exploring, and           
+     downloading data from open source data sources (see mer sources).              
+                                                                                    
+     Source Code:                                                                   
+     https://github.com/US-Marine-Energy-Resource/us-marine-energy-resource-python  
+     Issue Reporting:                                                               
+     https://github.com/US-Marine-Energy-Resource/us-marine-energy-resource-python/ 
+     issues                                                                         
+                                                                                    
+    ╭─ Commands ───────────────────────────────────────────────────────────────────╮
+    │ tidal     Query and download modeled tidal current data from the U.S. DOE    │
+    │           H2O High Resolution Tidal Hindcast, FVCOM simulations covering     │
+    │           five U.S. coastal regions: Cook Inlet AK, Aleutian Islands AK,     │
+    │           Salish Sea WA, Piscataqua River NH, and Western Passage ME.        │
+    │ wave      Query the U.S. DOE WPTO High-Resolution Wave Hindcast at a point.  │
+    │           The dataset covers 1979-2020 in six regions: West Coast, Atlantic, │
+    │           Hawaii, Alaska, Gulf of Mexico and Puerto Rico, and CNMI and Guam. │
+    │ sources   List the marine energy resource data sources                       │
+    │ ls        List the immediate children of a directory, dataset, or s3://      │
+    │           prefix.                                                            │
+    │ info      Show metadata: a prefix's sizes and a truncated tree, or a file's  │
+    │           global attributes plus each variable's attributes (HDF5/netCDF) or │
+    │           column schema (parquet). For a remote HDF5 file, add --variables   │
+    │           to collect every variable's attributes.                            │
+    │ explore   Inspect a file's contents (structure, values, statistics), or      │
+    │           browse a dataset's S3 layout. For a file, prints an overview by    │
+    │           default. --info, --tree, --attrs, --head, and --stats select a     │
+    │           single view.                                                       │
+    │ download  Download a file, or one level of a directory, with a size limit    │
+    │           and a progress bar.                                                │
+    ╰──────────────────────────────────────────────────────────────────────────────╯
+    ╭─ Options ────────────────────────────────────────────────────────────────────╮
+    │ --install-completion          Install completion for the current shell.      │
+    │ --show-completion             Show completion for the current shell, to copy │
+    │                               it or customize the installation.              │
+    ╰──────────────────────────────────────────────────────────────────────────────╯
+
+The `us-tidal` command from earlier releases still works as a deprecated
+alias for `mer tidal` and will be removed in a future release.
+
+### Tidal options
+
+``` bash
+mer tidal --help
+```
+
+    Usage: mer tidal [OPTIONS] [LOCATION]                                          
                                                                                     
      Query and download modeled tidal current data from the U.S. DOE H2O High       
-     Resolution Tidal Hindcast — FVCOM simulations covering five U.S. coastal       
+     Resolution Tidal Hindcast, FVCOM simulations covering five U.S. coastal        
      regions: Cook Inlet AK, Aleutian Islands AK, Salish Sea WA, Piscataqua River   
      NH, and Western Passage ME.                                                    
                                                                                     
@@ -686,41 +806,36 @@ us-tidal --help
     │   location      [LOCATION]  Point as lat,lon (e.g. 60.73,-151.43).           │
     ╰──────────────────────────────────────────────────────────────────────────────╯
     ╭─ Options ────────────────────────────────────────────────────────────────────╮
-    │ --coord               -c      TEXT   Transect waypoint as lat,lon. Repeat    │
-    │                                      for multi-segment lines.                │
-    │ --bbox                        TEXT   Bounding box as                         │
-    │                                      lat_min,lon_min,lat_max,lon_max.        │
-    │ --file                -f      PATH   Polygon from a GeoJSON file. Draw one   │
-    │                                      at https://geojson.io/next/.            │
-    │ --wkt                         TEXT   Polygon as a WKT POLYGON string or path │
-    │                                      to a .wkt file.                         │
-    │ --output-dir          -o      PATH   Copy downloaded parquet files to this   │
-    │                                      directory.                              │
-    │ --csv                                Export downloaded data as CSV files.    │
-    │                                      Written to --output-dir if set,         │
-    │                                      otherwise to the current directory.     │
-    │ --dry-run                            Show size estimate without downloading. │
-    │ --max-size-mb                 FLOAT  Abort if uncached data to download      │
-    │                                      exceeds this limit (MB). 0 = no limit.  │
-    │                                      [env var: US_TIDAL_MAX_SIZE_MB]         │
-    │                                      [default: 500.0]                        │
-    │ --max-distance-km             FLOAT  Reject if nearest face is farther than  │
-    │                                      this (km). Point queries only.          │
-    │ --config                      PATH   Path to config file (default:           │
-    │                                      ~/.us_tidal.toml).                      │
-    │ --aws-profile                 TEXT   Override AWS profile from config.       │
-    │ --cache-dir                   PATH   Override local cache directory from     │
-    │                                      config.                                 │
-    │ --use-hpc                            Use HPC local filesystem instead of S3. │
-    │ --hpc-base-path               TEXT   Override HPC dataset root path from     │
-    │                                      config.                                 │
-    │ --clear-cache                        Clear the local cache before running.   │
-    │ --install-completion                 Install completion for the current      │
-    │                                      shell.                                  │
-    │ --show-completion                    Show completion for the current shell,  │
-    │                                      to copy it or customize the             │
-    │                                      installation.                           │
-    │ --help                               Show this message and exit.             │
+    │ --coord            -c      TEXT   Transect waypoint as lat,lon. Repeat for   │
+    │                                   multi-segment lines.                       │
+    │ --bbox                     TEXT   Bounding box as                            │
+    │                                   lat_min,lon_min,lat_max,lon_max.           │
+    │ --file             -f      PATH   Polygon from a GeoJSON file. Draw one at   │
+    │                                   https://geojson.io/next/.                  │
+    │ --wkt                      TEXT   Polygon as a WKT POLYGON string or path to │
+    │                                   a .wkt file.                               │
+    │ --output-dir       -o      PATH   Copy downloaded parquet files to this      │
+    │                                   directory.                                 │
+    │ --csv                             Export downloaded data as CSV files.       │
+    │                                   Written to --output-dir if set, otherwise  │
+    │                                   to the current directory.                  │
+    │ --dry-run                         Show size estimate without downloading.    │
+    │ --max-size-mb              FLOAT  Abort if uncached data to download exceeds │
+    │                                   this limit (MB). 0 = no limit.             │
+    │                                   [env var: US_TIDAL_MAX_SIZE_MB]            │
+    │                                   [default: 500.0]                           │
+    │ --max-distance-km          FLOAT  Reject if nearest face is farther than     │
+    │                                   this (km). Point queries only.             │
+    │ --config                   PATH   Path to config file (default:              │
+    │                                   ~/.us_tidal.toml).                         │
+    │ --aws-profile              TEXT   Override AWS profile from config.          │
+    │ --cache-dir                PATH   Override local cache directory from        │
+    │                                   config.                                    │
+    │ --use-hpc                         Use HPC local filesystem instead of S3.    │
+    │ --hpc-base-path            TEXT   Override HPC dataset root path from        │
+    │                                   config.                                    │
+    │ --clear-cache                     Clear the local cache before running.      │
+    │ --help                            Show this message and exit.                │
     ╰──────────────────────────────────────────────────────────────────────────────╯
     ╭─ Dataset Info ───────────────────────────────────────────────────────────────╮
     │ --info                           Show dataset metadata, schema, and          │
@@ -746,30 +861,26 @@ us-tidal --help
     ╰──────────────────────────────────────────────────────────────────────────────╯
                                                                                     
      Examples                                                                       
-     us-tidal 60.73,-151.43                              Point query                
-     us-tidal --coord 60.7,-151.4 --coord 60.9,-151.2   Transect                    
-     us-tidal --bbox 60.7,-151.5,60.9,-151.2            Bounding box                
-     us-tidal --file study_area.geojson                  Polygon from file          
-     us-tidal --wkt "POLYGON((-151.5 60.7,...))"         Polygon from WKT           
-     us-tidal 60.73,-151.43 --dry-run                    Size estimate              
-     us-tidal 60.73,-151.43 --info                       Dataset info (no download) 
-     us-tidal 60.73,-151.43 --info-speed                 Speed category only        
-     us-tidal 60.73,-151.43 --info --layer 3             Layer 3 stats              
-     us-tidal 60.73,-151.43 --info --depth 15.0          Layer nearest 15 m         
-     us-tidal 60.73,-151.43 --info --depth-avg           Average all layers         
-     us-tidal --bbox 60.7,-151.5,60.9,-151.2 --info      Aggregate area info        
-     us-tidal 60.73,-151.43 --output-dir ./data          Save parquet files         
-     us-tidal 60.73,-151.43 --csv                        Export CSV to current dir  
-     us-tidal 60.73,-151.43 --csv --output-dir ./data    Export CSV to ./data       
+     mer tidal 60.73,-151.43                              Point query               
+     mer tidal --coord 60.7,-151.4 --coord 60.9,-151.2   Transect                   
+     mer tidal --bbox 60.7,-151.5,60.9,-151.2            Bounding box               
+     mer tidal --file study_area.geojson                  Polygon from file         
+     mer tidal --wkt "POLYGON((-151.5 60.7,...))"         Polygon from WKT          
+     mer tidal 60.73,-151.43 --dry-run                    Size estimate             
+     mer tidal 60.73,-151.43 --info                       Dataset info (no          
+     download)                                                                      
+     mer tidal 60.73,-151.43 --info --layer 3             Layer 3 stats             
+     mer tidal 60.73,-151.43 --output-dir ./data          Save parquet files        
+     mer tidal 60.73,-151.43 --csv                        Export CSV to current dir 
      Config file (~/.us_tidal.toml) sets defaults for AWS, cache, and HPC options.
 
 ### Point query: nearest grid point
 
-`us-tidal` accepts a positional `lat,lon` argument. Start with
+`mer tidal` accepts a positional `lat,lon` argument. Start with
 `--dry-run` to check the size before committing to a download.
 
 ``` bash
-us-tidal 60.73,-151.43 --dry-run
+mer tidal 60.73,-151.43 --dry-run
 ```
 
     face_id    00126601                                                            
@@ -790,7 +901,7 @@ local cache with no network traffic.
 
 ``` bash
 # First run - downloads from S3
-us-tidal 60.73,-151.43
+mer tidal 60.73,-151.43
 ```
 
     face_id    00126601                                                            
@@ -812,11 +923,11 @@ us-tidal 60.73,-151.43
 
       ✓  1 file cached at ~/.us_tidal_cache/marine-energy-data
 
-      Elapsed: 2.0s  (S3 download)
+      Elapsed: 2.2s  (S3 download)
 
 ``` bash
 # Second run - served from local cache
-us-tidal 60.73,-151.43
+mer tidal 60.73,-151.43
 ```
 
     face_id    00126601                                                            
@@ -838,15 +949,15 @@ us-tidal 60.73,-151.43
 
       ✓  1 file cached at ~/.us_tidal_cache/marine-energy-data
 
-      Elapsed: 0.9s  (local cache)
+      Elapsed: 1.3s  (local cache)
 
 ### Area query: all grid points in a bounding box
 
-`--bbox` takes `lat_min,lon_min,lat_max,lon_max`. Use `--dry-run` first;
-bbox queries can match thousands of faces.
+`--bbox` takes `lat_min,lon_min,lat_max,lon_max`. Use `--dry-run` first
+because bbox queries can match thousands of faces.
 
 ``` bash
-us-tidal --bbox 60.725,-151.445,60.735,-151.425 --dry-run
+mer tidal --bbox 60.725,-151.445,60.735,-151.425 --dry-run
 ```
 
     Matched 103 faces  ·  AK_cook_inlet
@@ -882,16 +993,16 @@ us-tidal --bbox 60.725,-151.445,60.735,-151.425 --dry-run
 
 ``` bash
 # Download all matched faces (~367 MB)
-us-tidal --bbox 60.725,-151.445,60.735,-151.425 --output-dir ./data
+mer tidal --bbox 60.725,-151.445,60.735,-151.425 --output-dir ./data
 ```
 
 ### Transect query: grid points along a line
 
-`--coord` defines a waypoint; repeat it to build a multi-segment path.
+`--coord` defines a waypoint. Repeat it to build a multi-segment path.
 All faces whose triangles geometrically intersect the path are returned.
 
 ``` bash
-us-tidal --coord 60.72,-151.43 --coord 60.75,-151.44 --dry-run
+mer tidal --coord 60.72,-151.43 --coord 60.75,-151.44 --dry-run
 ```
 
     Matched 39 faces  ·  AK_cook_inlet
@@ -927,23 +1038,25 @@ us-tidal --coord 60.72,-151.43 --coord 60.75,-151.44 --dry-run
 
 ``` bash
 # Download all matched faces (~139 MB)
-us-tidal --coord 60.72,-151.43 --coord 60.75,-151.44 --output-dir ./data
+mer tidal --coord 60.72,-151.43 --coord 60.75,-151.44 --output-dir ./data
 ```
 
 ### Export options
 
 ``` bash
 # Save parquet files to a directory
-us-tidal 60.73,-151.43 --output-dir ./data
+mer tidal 60.73,-151.43 --output-dir ./data
 
 # Export as CSV instead
-us-tidal 60.73,-151.43 --csv --output-dir ./data
+mer tidal 60.73,-151.43 --csv --output-dir ./data
 ```
 
 ### Configuration file
 
-`~/.us_tidal.toml` sets persistent defaults for AWS credentials, cache
-location, and HPC paths. CLI flags always override the config file.
+`~/.us_tidal.toml` sets persistent defaults for `mer tidal`: AWS
+credentials, cache location, and HPC paths. Its `[explore]` table sets
+transfer size limits for the `ls`, `info`, `explore`, and `download`
+verbs. CLI flags always override the config file.
 
 ``` toml
 # ~/.us_tidal.toml
