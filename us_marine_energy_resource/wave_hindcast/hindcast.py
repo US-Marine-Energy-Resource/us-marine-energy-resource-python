@@ -5,11 +5,13 @@
 
 ``df`` is indexed by UTC timestamp with one column per wave variable, covering
 every year the hindcast serves for that location, and ``df.attrs`` carries the
-metadata. Behind that call the coordinate is resolved to a grid node offline,
-the full record is requested from the API, and the archive is downloaded and
-organized. The call blocks, since archives take minutes to build server-side.
-Results are cached under ``~/.mer_wave_cache`` (override with ``cache_dir=``
-or ``MER_WAVE_CACHE_DIR``), so repeat calls are instant and offline.
+metadata. Behind that call the coordinate is resolved to a grid node offline
+and the record is fetched through a backend picked by query size: small
+queries read straight from the published files on S3 with no credentials, and
+large ones go through the download API, which builds an archive server-side.
+The call blocks while the data downloads. Results are cached under
+``~/.mer_wave_cache`` (override with ``cache_dir=`` or ``MER_WAVE_CACHE_DIR``),
+so repeat calls are instant and offline.
 
 Everything else here is optional:
 
@@ -103,7 +105,7 @@ def load_site(name: str, *, cache_dir: Path | None = None) -> tuple[pd.DataFrame
 
 
 def describe_point(
-    lat: float, lon: float, *, domain: str | None = None, backend: str = "api"
+    lat: float, lon: float, *, domain: str | None = None, backend: str = "auto"
 ) -> dict[str, Any]:
     """Resolve what a point maps to, without downloading anything.
 
@@ -116,8 +118,10 @@ def describe_point(
         Degrees. Note the order is lat then lon, unlike the API's WKT.
     domain : str, optional
         Force a hindcast domain instead of resolving it from coverage.
-    backend : str, default "api"
-        Which backend's view to report; year ranges differ per backend.
+    backend : str, default "auto"
+        Which backend's view to report, since year ranges differ per
+        backend. ``"auto"`` reports the s3 view, which is everything the
+        published files hold.
 
     Returns
     -------
@@ -134,7 +138,8 @@ def describe_point(
     """
     node = nodes.nearest(lat, lon, domain=domain)
     assert isinstance(node, nodes.WaveNode)
-    info = _backend.get_backend(backend).describe(node)
+    view = "s3" if backend == "auto" else backend
+    info = _backend.get_backend(view).describe(node)
     return {
         "location_id": node.location_id,
         "domain": node.domain,
@@ -159,7 +164,7 @@ def get_data_at_point(
     domain: str | None = None,
     force: bool = False,
     cache_dir: Path | None = None,
-    backend: str = "api",
+    backend: str = "auto",
     timeout_s: int = CONFIG.default_timeout_s,
     years: list[int] | None = None,
     variables: list[str] | None = None,
@@ -184,11 +189,14 @@ def get_data_at_point(
         Re-request even if the site is already on disk.
     cache_dir : Path, optional
         The wave cache root; defaults to :func:`default_cache_dir`.
-    backend : str, default "api"
-        ``"api"`` for the NLR developer download API (needs
-        ``NLR_DEVELOPER_API_KEY``/``NLR_DEVELOPER_EMAIL``), or ``"s3"`` for
-        direct reads of the published .h5 files (no key, slower for big
-        requests).
+    backend : str, default "auto"
+        ``"auto"`` reads small queries straight from the published .h5
+        files on S3, which needs no credentials, and switches to the
+        download API for large ones (see
+        :func:`~us_marine_energy_resource.wave_hindcast.backend.resolve_backend`).
+        ``"api"`` forces the NLR developer download API (needs
+        ``NLR_DEVELOPER_API_KEY``/``NLR_DEVELOPER_EMAIL``) and ``"s3"``
+        forces the direct reads (no key, slower for big requests).
     timeout_s : int, default 7200
         Ceiling on the archive wait. Timing out loses the wait, not the
         archive. The request is saved and a retry resumes.
@@ -241,8 +249,15 @@ def get_data_at_point(
             frame, metadata = load_site(name, cache_dir=root)
 
     if frame is None or metadata is None:
-        # Checked only once the cache has been consulted: data already
-        # downloaded stays readable even after its domain goes down.
+        # Resolved only once the cache has been consulted, so cached data
+        # loads without a backend choice at all.
+        backend, reason = _backend.resolve_backend(
+            backend, node.domain, years=years, variables=variables
+        )
+        if reason:
+            (on_event or _store._noop)(f"note: {reason}")
+        # Data already downloaded stays readable even after its domain's
+        # API goes down.
         if backend == "api":
             check_api_outage(node.domain)
 

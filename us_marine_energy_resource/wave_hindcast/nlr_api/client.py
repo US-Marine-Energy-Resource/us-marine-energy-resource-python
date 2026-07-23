@@ -97,6 +97,18 @@ def _credential(name: str) -> str | None:
     return None
 
 
+def has_credentials() -> bool:
+    """Report whether both credentials resolve, without raising.
+
+    Returns
+    -------
+    bool
+        True when both the API key and the contact email are set somewhere
+        :func:`credentials` looks.
+    """
+    return bool(_credential(CONFIG.api_key_env)) and bool(_credential(CONFIG.email_env))
+
+
 def credentials() -> tuple[str, str]:
     """Read the API key and contact email.
 
@@ -127,7 +139,8 @@ def credentials() -> tuple[str, str]:
         raise errors.CredentialsMissingError(
             f"not set: {', '.join(missing)}. Set them in the environment, in a "
             ".env file in the current directory, or in ~/.mer.env. A free key "
-            f"is available at {CONFIG.signup_url}"
+            f"is available at {CONFIG.signup_url}, and the s3 backend needs no "
+            "credentials at all."
         )
     assert api_key is not None and email is not None
     return api_key, email

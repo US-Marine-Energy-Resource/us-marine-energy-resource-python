@@ -36,6 +36,11 @@ _NON_VARIABLES = {"coordinates", "meta", "time_index"}
 MB_PER_VARIABLE_YEAR = 15
 SECONDS_PER_VARIABLE_YEAR = 20
 
+# Variables a published file typically carries, used for the same estimates
+# when no narrowing was given. The real list is only knowable by opening the
+# file, which costs the reads the estimate exists to warn about.
+TYPICAL_VARIABLES_PER_FILE = 9
+
 
 def _year_uri(domain: str, year: int) -> str:
     """Build the s3:// URI of one domain-year file.

@@ -5,12 +5,15 @@ Quick start::
     from us_marine_energy_resource import wave_hindcast
 
     info = wave_hindcast.describe_point(44.567, -124.229)   # no download, no API key
-    df = wave_hindcast.get_data_at_point(44.567, -124.229)  # blocks while the archive builds
+    df = wave_hindcast.get_data_at_point(44.567, -124.229)  # blocks while the data downloads
 
-Point queries go through the NLR developer download API and need
-``NLR_DEVELOPER_API_KEY`` and ``NLR_DEVELOPER_EMAIL`` set in the environment.
-Node lookup (``describe_point``, ``nearest``) is offline against a packaged
-index. Import is cheap: heavy dependencies load on first use.
+Point queries pick a backend automatically. Small queries read straight from
+the published files on S3 with no credentials, and large ones go through the
+NLR developer download API, which needs ``NLR_DEVELOPER_API_KEY`` and
+``NLR_DEVELOPER_EMAIL`` (force one with ``backend="s3"`` or
+``backend="api"``). Node lookup (``describe_point``, ``nearest``) is offline
+against a packaged index. Import is cheap: heavy dependencies load on first
+use.
 """
 
 from __future__ import annotations

@@ -1,8 +1,11 @@
 """The seam between the wave functions and backend that fetches the data.
 
-Two backends exist: the NLR developer download API (:mod:`.nlr_api`, the
-default) and direct range reads of the published .h5 files on S3
-(:mod:`.s3_direct`, slower but with no server-side build to fail).
+Two backends exist: the NLR developer download API (:mod:`.nlr_api`) and
+direct range reads of the published .h5 files on S3 (:mod:`.s3_direct`,
+slower for big requests but with no credentials and no server-side build to
+fail). The default is ``"auto"``: :func:`resolve_backend` reads small
+queries straight from S3, so discovery needs no account, and hands large
+ones to the API.
 
 A backend's job is one grid node's record. Location resolution
 (:mod:`.nodes`) and reading the on-disk result (:mod:`.hindcast`) live
@@ -18,7 +21,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from .config import CONFIG
+from .domains import API_OUTAGES, domain_config
 from .nodes import WaveNode
+
+# The auto backend reads small queries straight from S3 and hands large ones
+# to the download API. The seam is measured in variable-years, the years
+# fetched times the variables fetched: at the measured S3 cost of about
+# 15 MB and 20 seconds per variable-year, 30 variable-years is roughly
+# 450 MB and ten minutes of direct reading, which is where a server-built
+# archive becomes the better deal.
+AUTO_SEAM_VARIABLE_YEARS = 30
 
 
 @dataclass(frozen=True)
@@ -93,6 +106,74 @@ class WaveBackend(Protocol):
         ...
 
 
+def resolve_backend(
+    name: str,
+    domain: str,
+    *,
+    years: list[int] | None = None,
+    variables: list[str] | None = None,
+) -> tuple[str, str | None]:
+    """Resolve a backend name, turning ``"auto"`` into ``"api"`` or ``"s3"``.
+
+    Auto reads small queries straight from the published files on S3, which
+    needs no credentials, and hands large queries to the download API, which
+    builds the archive server-side. A query is large past
+    :data:`AUTO_SEAM_VARIABLE_YEARS` variable-years. A large query still
+    stays on S3 when the API cannot serve it: a recorded outage, a requested
+    year past the API's cap for the domain, or missing credentials.
+
+    Parameters
+    ----------
+    name : str
+        ``"auto"``, ``"api"``, or ``"s3"``. Explicit names pass through
+        untouched.
+    domain : str
+        The resolved hindcast domain.
+    years, variables : list, optional
+        The narrowed request. ``None`` means everything served.
+
+    Returns
+    -------
+    tuple of (str, str or None)
+        The concrete backend name and, when auto made a choice worth
+        explaining, one sentence saying why.
+    """
+    if name != "auto":
+        return name, None
+
+    config = domain_config(domain)
+    n_years = len(years) if years else config["last_year"] - config["first_year"] + 1
+    if variables:
+        n_variables = len(variables)
+    else:
+        # Function local so this module stays importable by the backends.
+        from .s3_direct.backend import TYPICAL_VARIABLES_PER_FILE
+
+        n_variables = TYPICAL_VARIABLES_PER_FILE
+
+    if n_years * n_variables <= AUTO_SEAM_VARIABLE_YEARS:
+        return "s3", None
+    if domain in API_OUTAGES:
+        return "s3", (
+            f"large query, but the {domain} API download service is not "
+            "working right now, so this reads directly from S3"
+        )
+    if years and max(years) > config["last_year"]:
+        return "s3", (
+            f"large query, but the API serves {domain} only through "
+            f"{config['last_year']}, so this reads directly from S3"
+        )
+    from .nlr_api.client import has_credentials
+
+    if not has_credentials():
+        return "s3", (
+            "large query with no API key configured, so this reads directly "
+            "from S3. The api backend is usually faster at this size, and a "
+            f"free key is available at {CONFIG.signup_url}"
+        )
+    return "api", "large query, so the api backend builds the archive server-side"
+
+
 def get_backend(name: str = "api") -> WaveBackend:
     """Return the named backend.
 
@@ -100,7 +181,8 @@ def get_backend(name: str = "api") -> WaveBackend:
     ----------
     name : str, default "api"
         ``"api"`` for the NLR developer download API, or ``"s3"`` for direct
-        reads of the published .h5 files.
+        reads of the published .h5 files. ``"auto"`` is not accepted here:
+        resolve it first with :func:`resolve_backend`.
 
     Returns
     -------
