@@ -1,7 +1,7 @@
 """
 US Marine Energy Resource — Python library for tidal energy data.
 
-Download, cache, and query the H20 High Resolution Tidal Hindcast dataset
+Download, cache, and query the H2O High Resolution Tidal Hindcast dataset
 stored on AWS (marine-energy-data S3 bucket).
 
 Quick start (high-level API)::
