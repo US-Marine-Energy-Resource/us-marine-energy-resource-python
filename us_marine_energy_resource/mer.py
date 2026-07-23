@@ -24,11 +24,11 @@ from .cli.sources import sources as _sources
 from .cli.wave import _WAVE_EPILOG, _WAVE_HELP
 from .cli.wave import wave_query as _wave_query
 from .explore.cli import (
-    _DOWNLOAD_HELP,
-    _EXPLORE_EPILOG,
-    _EXPLORE_HELP,
-    _INFO_HELP,
-    _LS_HELP,
+    DOWNLOAD_HELP,
+    EXPLORE_EPILOG,
+    EXPLORE_HELP,
+    INFO_HELP,
+    LS_HELP,
 )
 from .explore.cli import (
     download as _download,
@@ -126,13 +126,13 @@ app = typer.Typer(
 app.command("tidal", help=_MAIN_HELP, epilog=_TIDAL_EPILOG)(_tidal_query)
 app.command("wave", help=_WAVE_HELP, epilog=_WAVE_EPILOG)(_wave_query)
 app.command("sources", help=_SOURCES_HELP)(_sources)
-app.command("ls", help=_LS_HELP)(_ls)
+app.command("ls", help=LS_HELP)(_ls)
 app.command("list", hidden=True)(_ls)
-app.command("info", help=_INFO_HELP)(_info)
+app.command("info", help=INFO_HELP)(_info)
 app.command("i", hidden=True)(_info)
-app.command("explore", help=_EXPLORE_HELP, epilog=_EXPLORE_EPILOG)(_explore)
-app.command("exp", hidden=True, epilog=_EXPLORE_EPILOG)(_explore)
-app.command("download", help=_DOWNLOAD_HELP)(_download)
+app.command("explore", help=EXPLORE_HELP, epilog=EXPLORE_EPILOG)(_explore)
+app.command("exp", hidden=True, epilog=EXPLORE_EPILOG)(_explore)
+app.command("download", help=DOWNLOAD_HELP)(_download)
 app.command("dl", hidden=True)(_download)
 
 
