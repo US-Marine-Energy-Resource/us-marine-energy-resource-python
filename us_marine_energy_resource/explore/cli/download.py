@@ -101,7 +101,7 @@ def _do_download(
 
     part = dest.with_suffix(dest.suffix + ".part")
     _fetch_to(uri, ref, part, aws_profile)
-    part.rename(dest)
+    part.replace(dest)
     console.print(f"[green]saved[/] {dest}")
 
 

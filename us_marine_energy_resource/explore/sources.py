@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import BinaryIO
 from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 from .blockio import BlockCachedReader
 from .errors import SourceError
@@ -313,7 +314,8 @@ def resolve_source(uri: str, aws_profile: str | None = None) -> LocalSource | S3
         # No scheme, or a Windows drive letter that urlparse mistakes for one.
         return LocalSource(Path(uri))
     if parsed.scheme == "file":
-        return LocalSource(Path(parsed.path))
+        # netloc + path covers file:///C:/x, file://C:\x, and file:///posix/x.
+        return LocalSource(Path(url2pathname(parsed.netloc + parsed.path)))
     if parsed.scheme == "s3":
         return S3Source(parsed.netloc, parsed.path.lstrip("/"), aws_profile=aws_profile)
     if parsed.scheme in ("http", "https"):
