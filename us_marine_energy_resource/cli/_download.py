@@ -118,7 +118,7 @@ def download_with_progress(
         TimeElapsedColumn(),
         console=console,
     ) as progress:
-        task = progress.add_task(f"[cyan]{label}[/]", total=len(paths))
+        task = progress.add_task(f"[bright_blue]{label}[/]", total=len(paths))
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             future_to_path = {pool.submit(cache.get, p): p for p in paths}
             for future in as_completed(future_to_path):

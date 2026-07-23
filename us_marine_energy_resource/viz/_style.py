@@ -8,6 +8,7 @@ from typing import Any, TypeVar
 import cmocean
 import matplotlib
 import matplotlib.dates as mdates
+import matplotlib.figure
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -22,7 +23,7 @@ PLOT_CONFIG: dict[str, float | None] = {
     "max_fig_height": 3.0,
 }
 
-_SOURCE_CAPTION = "Source: U.S. DOE H20 High Resolution Tidal Hindcast, Yang et al., 2025"
+_SOURCE_CAPTION = "Source: U.S. DOE H2O High Resolution Tidal Hindcast, Yang et al., 2025"
 
 # Reference height (inches) used by figure_fontsize when no override is given.
 # Matches PLOT_CONFIG["max_fig_height"] so that fonts at the default figure
@@ -490,7 +491,10 @@ def _save_figure(result: Any, settings: Any) -> None:
 
     p = Path(save_path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(p, dpi=150, bbox_inches="tight")
+    # A figure may opt out of tight cropping (e.g. a hand-laid-out composite with
+    # a cartopy GeoAxes, whose NaN tight bbox would otherwise crop the canvas).
+    bbox = getattr(fig, "_mer_save_bbox_inches", "tight")
+    fig.savefig(p, dpi=150, bbox_inches=bbox)
     plt.close(fig)
 
 

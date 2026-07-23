@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ..manifest import TidalManifestQuery
 
 try:
-    import tomllib
+    import tomllib  # pyright: ignore[reportMissingImports]
 except ImportError:
     import tomli as tomllib  # type: ignore[no-redef]
 
@@ -97,7 +97,7 @@ class ConnectionConfig:
 
         if self.use_hpc:
             base = self.hpc_base_path or _defaults["storage"]["hpc_base_path"]
-            with console.status("[cyan]Locating HPC manifest…"):
+            with console.status("[bright_blue]Locating HPC manifest…"):
                 manifest_path = find_latest_manifest_hpc(base)
             if manifest_path is None:
                 error(f"No manifest found on HPC at {base!r}")
@@ -113,10 +113,10 @@ class ConnectionConfig:
         )
 
         if self.clear_cache:
-            with console.status("[yellow]Clearing cache…"):
+            with console.status("[bright_blue]Clearing cache…"):
                 cache.clear_cache()
 
-        with console.status("[cyan]Locating manifest…"):
+        with console.status("[bright_blue]Locating manifest…"):
             result = find_latest_manifest_s3(cache)
 
         if result is None:
@@ -177,7 +177,7 @@ InfoSpeedOpt = Annotated[
     bool,
     typer.Option(
         "--info-speed",
-        help="Show speed category info only (implies [bold]--info[/]).",
+        help="Show speed category info only (implies [bright_blue]--info[/]).",
         rich_help_panel=_INFO_PANEL,
     ),
 ]
@@ -185,7 +185,7 @@ InfoDirectionOpt = Annotated[
     bool,
     typer.Option(
         "--info-direction",
-        help="Show direction category info only (implies [bold]--info[/]).",
+        help="Show direction category info only (implies [bright_blue]--info[/]).",
         rich_help_panel=_INFO_PANEL,
     ),
 ]
@@ -193,7 +193,7 @@ InfoPowerOpt = Annotated[
     bool,
     typer.Option(
         "--info-power",
-        help="Show power density category info only (implies [bold]--info[/]).",
+        help="Show power density category info only (implies [bright_blue]--info[/]).",
         rich_help_panel=_INFO_PANEL,
     ),
 ]
@@ -201,7 +201,7 @@ InfoDepthOpt = Annotated[
     bool,
     typer.Option(
         "--info-depth",
-        help="Show depth/water-level category info only (implies [bold]--info[/]).",
+        help="Show depth/water-level category info only (implies [bright_blue]--info[/]).",
         rich_help_panel=_INFO_PANEL,
     ),
 ]
@@ -210,7 +210,7 @@ LayerOpt = Annotated[
     typer.Option(
         "--layer",
         help=(
-            "Sigma layer for [bold]--info[/] statistics (0=surface, 9=near-bed). "
+            "Sigma layer for [bright_blue]--info[/] statistics (0=surface, 9=near-bed). "
             "Repeat to select multiple layers."
         ),
         rich_help_panel=_INFO_PANEL,
@@ -222,7 +222,7 @@ DepthTargetOpt = Annotated[
         "--depth",
         help=(
             "Select the sigma layer nearest to this depth (m from surface) for "
-            "[bold]--info[/] statistics. Approximate — uses footer depth stats."
+            "[bright_blue]--info[/] statistics. Approximate — uses footer depth stats."
         ),
         rich_help_panel=_INFO_PANEL,
     ),
@@ -231,7 +231,7 @@ DepthAvgOpt = Annotated[
     bool,
     typer.Option(
         "--depth-avg",
-        help="Average [bold]--info[/] statistics across all sigma layers.",
+        help="Average [bright_blue]--info[/] statistics across all sigma layers.",
         rich_help_panel=_INFO_PANEL,
     ),
 ]
@@ -288,7 +288,7 @@ CsvOpt = Annotated[
         "--csv",
         help=(
             "Export downloaded data as CSV files. "
-            "Written to [bold]--output-dir[/] if set, otherwise to the current directory."
+            "Written to [bright_blue]--output-dir[/] if set, otherwise to the current directory."
         ),
     ),
 ]

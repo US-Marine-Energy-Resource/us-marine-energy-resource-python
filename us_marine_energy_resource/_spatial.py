@@ -13,6 +13,9 @@ All public functions follow this two-layer execution model:
     Runs an exact ST_Contains / ST_Intersects test against triangle vertices.
     Results from multiple locations are unioned into a single DataFrame.
 
+All geometry math goes through :mod:`.gis` (the DuckDB spatial extension),
+per the single-source GIS rule.
+
 Public API
 ----------
 find_faces_point(lat, lon, location=None)  -> pd.DataFrame
@@ -22,8 +25,8 @@ find_faces_line(coords, location=None)     -> pd.DataFrame
 Each function returns a DataFrame with columns:
   location, face_id, lat_fixed_precision, lon_fixed_precision,
   c1_lat, c1_lon, c2_lat, c2_lon, c3_lat, c3_lon,
-  distance_km  (centroid → query point; 0.0 for containing faces)
-  [line queries also return: frac_along, distance_from_line_m]
+  distance_km  (query point → nearest point on the face; 0.0 for containing)
+  [line queries also return: frac_along, chord_m]
 """
 
 from __future__ import annotations
@@ -32,10 +35,15 @@ import importlib.resources
 import json
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import duckdb
 import pandas as pd
+
+from . import gis
+from .gis import Geom, LatLon
+
+if TYPE_CHECKING:
+    import duckdb
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -94,10 +102,7 @@ def _bounds_path() -> str:
 
 
 def _connect() -> duckdb.DuckDBPyConnection:
-    con = duckdb.connect()
-    con.execute("INSTALL spatial;")
-    con.execute("LOAD spatial;")
-    return con
+    return gis.connection()
 
 
 # ---------------------------------------------------------------------------
@@ -135,52 +140,12 @@ _ERROR_MESSAGES: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
-# WKT geometry builders
+# Geometry adapters (the (lat, lon) tuple API adapted onto gis types)
 # ---------------------------------------------------------------------------
 
 
-def _point_wkt(lat: float, lon: float) -> str:
-    return f"POINT({lon} {lat})"
-
-
-def _point_wkt_360(lat: float, lon: float) -> str:
-    lon360 = lon + 360.0 if lon < 0.0 else lon
-    return f"POINT({lon360} {lat})"
-
-
-def _coords_to_ring(coords: Sequence[tuple[float, float]]) -> list[str]:
-    pts = [f"{lon} {lat}" for lat, lon in coords]
-    if pts[0] != pts[-1]:
-        pts.append(pts[0])
-    return pts
-
-
-def _polygon_wkt(coords: Sequence[tuple[float, float]]) -> str:
-    pts = _coords_to_ring(coords)
-    return f"POLYGON(({', '.join(pts)}))"
-
-
-def _polygon_wkt_360(coords: Sequence[tuple[float, float]]) -> str:
-    def _lon360(lon: float) -> float:
-        return lon + 360.0 if lon < 0.0 else lon
-
-    pts = [f"{_lon360(lon)} {lat}" for lat, lon in coords]
-    if pts[0] != pts[-1]:
-        pts.append(pts[0])
-    return f"POLYGON(({', '.join(pts)}))"
-
-
-def _line_wkt(coords: Sequence[tuple[float, float]]) -> str:
-    pts = [f"{lon} {lat}" for lat, lon in coords]
-    return f"LINESTRING({', '.join(pts)})"
-
-
-def _line_wkt_360(coords: Sequence[tuple[float, float]]) -> str:
-    def _lon360(lon: float) -> float:
-        return lon + 360.0 if lon < 0.0 else lon
-
-    pts = [f"{_lon360(lon)} {lat}" for lat, lon in coords]
-    return f"LINESTRING({', '.join(pts)})"
+def _latlons(coords: Sequence[tuple[float, float]]) -> list[LatLon]:
+    return [LatLon(lat=lat, lon=lon) for lat, lon in coords]
 
 
 # ---------------------------------------------------------------------------
@@ -192,33 +157,31 @@ _FACE_COLS = (
     "c1_lat, c1_lon, c2_lat, c2_lon, c3_lat, c3_lon"
 )
 
-_TRIANGLE = """\
-ST_MakePolygon(ST_MakeLine(ARRAY[
-    ST_Point(c1_lon::DOUBLE, c1_lat::DOUBLE),
-    ST_Point(c2_lon::DOUBLE, c2_lat::DOUBLE),
-    ST_Point(c3_lon::DOUBLE, c3_lat::DOUBLE),
-    ST_Point(c1_lon::DOUBLE, c1_lat::DOUBLE)
-]))"""
+# One mesh face as a geometry, from the triangle corner columns.
+_TRIANGLE = gis.make_polygon(
+    [
+        gis.column_point(lon_sql="c1_lon::DOUBLE", lat_sql="c1_lat::DOUBLE"),
+        gis.column_point(lon_sql="c2_lon::DOUBLE", lat_sql="c2_lat::DOUBLE"),
+        gis.column_point(lon_sql="c3_lon::DOUBLE", lat_sql="c3_lat::DOUBLE"),
+    ]
+)
 
-# Coordinate precision: decimal places stored in parquet centroid columns (≈ 1 cm ground resolution).
+# Coordinate precision: decimal places stored in parquet centroid columns
+# (≈ 1 cm ground resolution).
 _COORD_DECIMAL_PRECISION: int = 7
 _COORD_PRECISION_SCALE: int = 10**_COORD_DECIMAL_PRECISION
 
-# Bounding-box pre-filter margin: 0.1° in the same integer coordinate space ≈ 11 km at equator.
-_CENTROID_BBOX_MARGIN: int = _COORD_PRECISION_SCALE // 10
 
-
-def _face_distance_km_expr(lat: float, lon: float) -> str:
+def _face_distance_km_expr(pt: LatLon) -> str:
     """Distance from query point to the nearest point ON the triangle face.
 
     Returns 0.0 for containing faces (query is inside the triangle).
     Returns exact edge distance for non-containing faces.
     Replaces centroid-based distance, which is an approximation.
     """
-    query_pt = f"ST_Point({lon}::DOUBLE, {lat}::DOUBLE)"
-    return (
-        f"ST_Distance_Sphere(    ST_ClosestPoint({_TRIANGLE}, {query_pt}),    {query_pt}) / 1000.0"
-    )
+    query_pt = gis.point(pt)
+    closest = gis.closest_point(_TRIANGLE, query_pt)
+    return f"{gis.distance_m_sql(closest, query_pt)} / 1000.0"
 
 
 # ---------------------------------------------------------------------------
@@ -242,22 +205,17 @@ def _domain_summary(con: duckdb.DuckDBPyConnection) -> str:
 
 def _intersects_boundary(
     con: duckdb.DuckDBPyConnection,
-    boundary_wkt: str,
-    query_wkt: str,
+    boundary: Geom,
+    query: Geom,
 ) -> bool:
-    result = con.execute(f"""
-        SELECT ST_Intersects(
-            ST_GeomFromText('{boundary_wkt}'),
-            ST_GeomFromText('{query_wkt}')
-        )
-    """).fetchone()
+    result = con.execute(f"SELECT {gis.intersects_sql(boundary, query)}").fetchone()
     return bool(result and result[0])
 
 
 def _resolve_locations(
     con: duckdb.DuckDBPyConnection,
-    query_wkt_standard: str,
-    query_wkt_360: str,
+    query_standard: Geom,
+    query_360: Geom,
     query_kind: str,
     location: str | None,
     lat: float | None = None,
@@ -279,8 +237,8 @@ def _resolve_locations(
 
     matched: list[str] = []
     for loc, boundary_wkt, crosses_antimeridian in bounds:
-        query_wkt = query_wkt_360 if crosses_antimeridian else query_wkt_standard
-        if _intersects_boundary(con, boundary_wkt, query_wkt):
+        query = query_360 if crosses_antimeridian else query_standard
+        if _intersects_boundary(con, gis.from_wkt(boundary_wkt), query):
             matched.append(loc)
 
     if matched:
@@ -292,32 +250,6 @@ def _resolve_locations(
     domains = _domain_summary(con)
     msg = template.format(lat=lat or 0.0, lon=lon or 0.0, domains=domains)
     raise cls(msg)
-
-
-# ---------------------------------------------------------------------------
-# Triangle query helpers
-# ---------------------------------------------------------------------------
-
-
-def _bbox_clause(
-    lat_fixed_precision: int, lon_fixed_precision: int, margin: int = _CENTROID_BBOX_MARGIN
-) -> str:
-    return (
-        f"lat_fixed_precision BETWEEN {lat_fixed_precision - margin} AND {lat_fixed_precision + margin} "
-        f"AND lon_fixed_precision BETWEEN {lon_fixed_precision - margin} AND {lon_fixed_precision + margin}"
-    )
-
-
-def _envelope_bbox_clause(lat_min: float, lat_max: float, lon_min: float, lon_max: float) -> str:
-    margin = _CENTROID_BBOX_MARGIN
-    lat_min_fp = int(lat_min * _COORD_PRECISION_SCALE) - margin
-    lat_max_fp = int(lat_max * _COORD_PRECISION_SCALE) + margin
-    lon_min_fp = int(lon_min * _COORD_PRECISION_SCALE) - margin
-    lon_max_fp = int(lon_max * _COORD_PRECISION_SCALE) + margin
-    return (
-        f"lat_fixed_precision BETWEEN {lat_min_fp} AND {lat_max_fp} "
-        f"AND lon_fixed_precision BETWEEN {lon_min_fp} AND {lon_max_fp}"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -349,30 +281,25 @@ def find_faces_point(
         If (lat, lon) is outside all dataset domains.
     """
     con = _connect()
-    query_wkt = _point_wkt(lat, lon)
-    query_wkt_360 = _point_wkt_360(lat, lon)
-
+    pt = LatLon(lat=lat, lon=lon)
     matched_locs = _resolve_locations(
-        con, query_wkt, query_wkt_360, "point", location, lat=lat, lon=lon
+        con, gis.point(pt), gis.point(pt, wrap_360=True), "point", location, lat=lat, lon=lon
     )
 
-    lat_fixed_precision = round(lat * _COORD_PRECISION_SCALE)
-    lon_fixed_precision = round(lon * _COORD_PRECISION_SCALE)
-    dist_expr = _face_distance_km_expr(lat, lon)
+    dist_expr = _face_distance_km_expr(pt)
     parts: list[pd.DataFrame] = []
 
     for loc in matched_locs:
-        df = con.execute(f"""
+        frame = con.execute(f"""
             SELECT {_FACE_COLS},
                 {dist_expr} AS distance_km,
-                ST_Contains({_TRIANGLE}, ST_Point({lon}::DOUBLE, {lat}::DOUBLE))
+                {gis.contains_sql(_TRIANGLE, gis.point(pt))}
                     AS is_containing
             FROM read_parquet('{_geometry_path(loc)}')
-            WHERE {_bbox_clause(lat_fixed_precision, lon_fixed_precision)}
             ORDER BY is_containing DESC, distance_km ASC
             LIMIT 1
         """).df()
-        parts.append(df)
+        parts.append(frame)
 
     result = pd.concat(parts, ignore_index=True)
     # Across locations, keep the single best match (containing first, then nearest).
@@ -408,32 +335,25 @@ def find_faces_area(
     if len(coords) < 3:
         raise ValueError("Area query requires at least 3 coordinate pairs.")
 
-    lats = [c[0] for c in coords]
-    lons = [c[1] for c in coords]
-
     con = _connect()
-    query_wkt = _polygon_wkt(coords)
-    query_wkt_360 = _polygon_wkt_360(coords)
+    ring = gis.Polygon(_latlons(coords))
+    area = ring.geom()
+    matched_locs = _resolve_locations(con, area, ring.geom(wrap_360=True), "area", location)
 
-    matched_locs = _resolve_locations(con, query_wkt, query_wkt_360, "area", location)
-
-    bbox = _envelope_bbox_clause(min(lats), max(lats), min(lons), max(lons))
-    area_geom = f"ST_GeomFromText('{query_wkt}')"
+    face_closest = gis.closest_point(_TRIANGLE, area)
+    area_closest = gis.closest_point(area, face_closest)
     parts: list[pd.DataFrame] = []
 
     for loc in matched_locs:
-        df = con.execute(f"""
+        frame = con.execute(f"""
             SELECT {_FACE_COLS},
-                ST_Distance_Sphere(
-                    ST_ClosestPoint({area_geom}, ST_ClosestPoint({_TRIANGLE}, {area_geom})),
-                    ST_ClosestPoint({_TRIANGLE}, {area_geom})
-                ) / 1000.0 AS distance_km
+                {gis.distance_m_sql(area_closest, face_closest)} / 1000.0
+                    AS distance_km
             FROM read_parquet('{_geometry_path(loc)}')
-            WHERE {bbox}
-              AND ST_Intersects({_TRIANGLE}, {area_geom})
+            WHERE {gis.intersects_sql(_TRIANGLE, area)}
             ORDER BY distance_km ASC
         """).df()
-        parts.append(df)
+        parts.append(frame)
 
     if not parts:
         return pd.DataFrame()
@@ -474,32 +394,29 @@ def find_faces_line(
     if len(coords) < 2:
         raise ValueError("Line query requires at least 2 coordinate pairs.")
 
-    lats = [c[0] for c in coords]
-    lons = [c[1] for c in coords]
-
     con = _connect()
-    query_wkt = _line_wkt(coords)
-    query_wkt_360 = _line_wkt_360(coords)
+    path = gis.Line(_latlons(coords))
+    line = path.geom()
+    matched_locs = _resolve_locations(con, line, path.geom(wrap_360=True), "line", location)
 
-    matched_locs = _resolve_locations(con, query_wkt, query_wkt_360, "line", location)
-
-    bbox = _envelope_bbox_clause(min(lats), max(lats), min(lons), max(lons))
-    line_geom = f"ST_GeomFromText('{query_wkt}')"
     parts: list[pd.DataFrame] = []
 
     for loc in matched_locs:
-        df = con.execute(f"""
+        frame = con.execute(f"""
             SELECT {_FACE_COLS},
-                ST_LineLocatePoint({line_geom}, ST_Centroid({_TRIANGLE}))
-                    AS frac_along
+                {gis.line_locate_sql(line, gis.centroid(_TRIANGLE))}
+                    AS frac_along,
+                {gis.length_m_sql(gis.intersection(_TRIANGLE, line))}
+                    AS chord_m
             FROM read_parquet('{_geometry_path(loc)}')
-            WHERE {bbox}
-              AND ST_Intersects({_TRIANGLE}, {line_geom})
+            WHERE {gis.intersects_sql(_TRIANGLE, line)}
             ORDER BY frac_along ASC
         """).df()
-        parts.append(df)
+        parts.append(frame)
 
     if not parts:
         return pd.DataFrame()
+    # chord_m is the true control-volume width along the transect: the chord
+    # where the line crosses each triangle (metres), the correct dx for flux.
     result = pd.concat(parts, ignore_index=True)
     return result.sort_values("frac_along").reset_index(drop=True)
