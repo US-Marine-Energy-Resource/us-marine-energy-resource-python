@@ -39,6 +39,7 @@ _DEFAULT_VARIABLES: tuple[str, ...] = (
 )
 _DEFAULT_YEARS_SPAN = 1
 
+
 def _prose_list(items: list[str]) -> str:
     """Join items into prose with commas and a final "and".
 
@@ -75,8 +76,19 @@ def _count_word(n: int) -> str:
         "four", "six", and so on, or ``str(n)`` past twelve.
     """
     words = (
-        "zero", "one", "two", "three", "four", "five", "six",
-        "seven", "eight", "nine", "ten", "eleven", "twelve",
+        "zero",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "eleven",
+        "twelve",
     )
     return words[n] if 0 <= n < len(words) else str(n)
 

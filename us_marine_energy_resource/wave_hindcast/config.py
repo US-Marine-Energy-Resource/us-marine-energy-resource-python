@@ -2,8 +2,9 @@
 
 One place for the facts a user or operator might care about: service URLs,
 environment variable names, the cache layout on disk, the wave node index
-layout, and the default archive timeout. Tuning constants that shape one algorithm stay next to the code they
-tune. Stdlib-only at import, so any module can import it without cycles.
+layout, and the default archive timeout. Tuning constants that shape one
+algorithm stay next to the code they tune. Stdlib-only at import, so any
+module can import it without cycles.
 """
 
 from __future__ import annotations
