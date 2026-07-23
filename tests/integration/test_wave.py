@@ -25,9 +25,13 @@ def test_describe_point_pacwave() -> None:
     info = hindcast.describe_point(*PACWAVE)
     assert info["domain"] == "West_Coast"
     assert info["location_id"] == 479519
-    assert info["endpoint"] == "us-west-coast-hindcast-download"
+    assert info["endpoint"] == "s3://wpto-pds-us-wave"
     assert info["years"] == [1979, 2020]
     assert info["distance_m"] < 300
+
+    # The API view still maps the node to its per-domain download slug.
+    api_info = hindcast.describe_point(*PACWAVE, backend="api")
+    assert api_info["endpoint"] == "us-west-coast-hindcast-download"
 
 
 # One verified in-domain point per domain the index covers well.

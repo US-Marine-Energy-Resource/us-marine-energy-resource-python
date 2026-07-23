@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +13,11 @@ from typer.testing import CliRunner
 from us_marine_energy_resource.mer import app
 
 runner = CliRunner()
+
+# On GitHub Actions typer forces color even under CliRunner, and its option
+# highlighter splits flags like --info into two ANSI segments, so plain
+# substring checks need the codes stripped first.
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def test_lazy_import_contract() -> None:
@@ -57,8 +63,10 @@ def test_mer_sources_lists_both_datasets() -> None:
 def test_mer_explore_help_lists_modes() -> None:
     """Mer explore help lists the mode flags."""
     result = runner.invoke(app, ["explore", "--help"])
+    assert result.exit_code == 0
+    plain = _ANSI.sub("", result.output)
     for flag in ("--info", "--tree", "--attrs", "--head", "--stats"):
-        assert flag in result.output
+        assert flag in plain
 
 
 def test_mer_tidal_binds_positional() -> None:
