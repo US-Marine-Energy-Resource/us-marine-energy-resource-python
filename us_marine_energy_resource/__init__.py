@@ -31,7 +31,7 @@ import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from . import tidal_hindcast
+    from . import tidal_hindcast, wave_hindcast
     from .cache import S3CacheManager
     from .manifest import TidalManifestQuery, find_latest_manifest_hpc, find_latest_manifest_s3
 
@@ -41,10 +41,11 @@ __all__ = [
     "find_latest_manifest_hpc",
     "find_latest_manifest_s3",
     "tidal_hindcast",
+    "wave_hindcast",
 ]
 
 # Submodules that can be returned directly.
-_SUBMODULES = {"tidal_hindcast"}
+_SUBMODULES = {"tidal_hindcast", "wave_hindcast"}
 
 # Symbols that live inside a submodule — (submodule_path, attr_name).
 _SYMBOLS: dict[str, tuple[str, str]] = {
