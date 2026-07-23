@@ -45,7 +45,15 @@ typer.rich_utils.STYLE_OPTION = "bold bright_blue"
 typer.rich_utils.STYLE_SWITCH = "bold green"
 typer.rich_utils.STYLE_NEGATIVE_OPTION = "bright_blue"
 typer.rich_utils.STYLE_NEGATIVE_SWITCH = "green"
-typer.rich_utils.STYLE_METAVAR = "bright_blue"
+# typer 0.27 renamed STYLE_METAVAR* to STYLE_TYPES* (fastapi/typer#1863).
+# Set both spellings via setattr so the palette holds on either side of the
+# rename and the type checker accepts whichever name the installed typer lacks.
+for _name, _style in (
+    ("STYLE_METAVAR", "bright_blue"),
+    ("STYLE_TYPES", "bright_blue"),
+    ("STYLE_TYPES_SEPARATOR", "dim bright_blue"),
+):
+    setattr(typer.rich_utils, _name, _style)
 typer.rich_utils.STYLE_USAGE = "bright_blue"
 typer.rich_utils.STYLE_USAGE_COMMAND = "bold bright_blue"
 typer.rich_utils.STYLE_DEPRECATED = "bold bright_blue"
