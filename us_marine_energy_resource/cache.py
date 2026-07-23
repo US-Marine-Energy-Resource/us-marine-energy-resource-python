@@ -439,7 +439,7 @@ class S3CacheManager:
 
         region = resolve_s3_region(self.bucket)
         if self.aws_profile:
-            fs = S3FileSystem(profile=self.aws_profile, region=region)
+            fs = S3FileSystem(profile=self.aws_profile, region=region)  # pyright: ignore[reportCallIssue]
         else:
             fs = S3FileSystem(anonymous=True, region=region)
 

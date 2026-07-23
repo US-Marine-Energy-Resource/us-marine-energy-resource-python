@@ -125,7 +125,7 @@ def find_latest_manifest_s3(
 
     s3_version_dirs: list[tuple[str, tuple[int, int, int]]] = []
     for prefix_info in response.get("CommonPrefixes", []):
-        dir_name = prefix_info["Prefix"].rstrip("/").split("/")[-1]
+        dir_name = prefix_info["Prefix"].rstrip("/").split("/")[-1]  # pyright: ignore[reportTypedDictNotRequiredAccess]
         if dir_name.startswith("v"):
             with contextlib.suppress(ValueError):
                 s3_version_dirs.append((dir_name, parse_semver(dir_name[1:])))

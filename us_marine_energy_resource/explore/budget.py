@@ -269,7 +269,7 @@ def _policy_from_config(config_file: Path | None) -> TransferPolicy:
     if not path.exists():
         return TransferPolicy()
     try:
-        import tomllib
+        import tomllib  # pyright: ignore[reportMissingImports]
     except ImportError:
         import tomli as tomllib  # type: ignore[no-redef]
     with open(path, "rb") as f:

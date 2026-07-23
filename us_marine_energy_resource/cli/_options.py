@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ..manifest import TidalManifestQuery
 
 try:
-    import tomllib
+    import tomllib  # pyright: ignore[reportMissingImports]
 except ImportError:
     import tomli as tomllib  # type: ignore[no-redef]
 
