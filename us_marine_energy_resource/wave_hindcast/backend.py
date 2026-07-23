@@ -26,8 +26,8 @@ class BackendInfo:
     """What one backend serves for a domain.
 
     Backend-specific on purpose: the download API caps Atlantic and Hawaii at
-    2010, while the .h5 files on S3 carry all 42 Atlantic years -- a future
-    backend reading those files would report a different range here.
+    2010, while the .h5 files on S3 carry the full record, so a backend
+    reading those files reports a different range here.
     """
 
     endpoint: str

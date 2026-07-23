@@ -9,15 +9,15 @@ that offline:
     >>> nodes.nearest(44.5670485, -124.22896475)
     WaveNode(location_id=479519, domain='West_Coast',
              endpoint='us-west-coast-hindcast-download',
-             lat=44.5682, lon=-124.228, distance_m=142.3)
+             lat=44.5682, lon=-124.228, distance_m=149.1)
 
     >>> nodes.nearest(21.46488, -157.751524, k=5)   # DataFrame, ranked
     >>> nodes.nearest(lat, lon, domain='Atlantic')  # skip the domain gate
 
 ``location_id`` is the value to pass as the API's ``location_ids`` parameter.
 Backed by a parquet index, one file per domain, resolved by :mod:`.index`, so
-a query touches the network at most once per domain. Distances are haversine
-metres on a sphere, plain SQL math with no DuckDB spatial extension.
+a query touches the network at most once per domain. Distances come from
+DuckDB's spatial extension via :mod:`..gis`.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from .. import gis
 from ..explore.lazy import lazy_import
 from . import errors, index
 from .domains import DOMAIN_ENDPOINTS
@@ -33,13 +34,10 @@ from .domains import DOMAIN_ENDPOINTS
 if TYPE_CHECKING:
     import pandas as pd
 
-# Half-width of the integer bbox prefilter, in degrees. Row order is spatially
-# coherent, so row group min/max statistics let a BETWEEN skip most of the file.
-# Far wider than any grid spacing here but still discards almost every row.
-_BBOX_MARGIN_DEG = 0.5
-
-# Mean earth radius in metres, the same sphere ST_Distance_Sphere uses.
-_EARTH_RADIUS_M = 6371008.8
+# How far a queried point may sit from the grid before it is an error rather
+# than a snap. A product decision, not geometry: sites just off the last node
+# (nearshore buoys) should resolve, points in another ocean should not.
+_MAX_SNAP_M = 50_000
 
 
 @dataclass(frozen=True)
@@ -52,23 +50,6 @@ class WaveNode:
     lat: float
     lon: float
     distance_m: float
-
-
-_state: dict[str, Any] = {}
-
-
-def _connection() -> Any:
-    """Return a shared in-memory DuckDB connection.
-
-    Returns
-    -------
-    duckdb.DuckDBPyConnection
-        The connection, created on first use and reused after that.
-    """
-    if "con" not in _state:
-        duckdb = lazy_import("duckdb", "querying the wave node index")
-        _state["con"] = duckdb.connect()
-    return _state["con"]
 
 
 def domains() -> list[str]:
@@ -114,7 +95,7 @@ def within(lat: float, lon: float, rings: int = 1) -> list[str]:
 
     return [
         row[0]
-        for row in _connection()
+        for row in gis.connection()
         .execute(
             f"""
             SELECT DISTINCT domain FROM read_parquet('{path.as_posix()}')
@@ -178,42 +159,27 @@ def _query_domain(domain: str, lat: float, lon: float, k: int) -> pd.DataFrame:
     """
     idx = index.load_index()
     path = index.data_path(idx["node_files"][domain])
-    scale = idx["coord_scale"]
-    margin = int(_BBOX_MARGIN_DEG * scale)
-    lat_fixed = round(lat * scale)
-    lon_fixed = round(lon * scale)
+    scale_f = float(idx["coord_scale"])
 
-    # Haversine, inlined as plain SQL so the spatial extension never has to be
-    # downloaded, and so nobody re-discovers that ST_Distance_Sphere reads its
-    # ST_Point arguments as (latitude, longitude).
-    scale_f = float(scale)
+    # A full scan handles the antimeridian natively: a bbox prefilter cannot,
+    # without wrap logic this module no longer hand-rolls.
+    node = gis.column_point(lon_sql=f"lon_fixed / {scale_f}", lat_sql=f"lat_fixed / {scale_f}")
+    query = gis.point(gis.LatLon(lat=lat, lon=lon))
     return (
-        _connection()
+        gis.connection()
         .execute(
             f"""
-        SELECT location_id,
-               lat_fixed / {scale_f} AS lat,
-               lon_fixed / {scale_f} AS lon,
-               2 * {_EARTH_RADIUS_M} * asin(sqrt(
-                   pow(sin(radians(lat_fixed / {scale_f} - ?) / 2), 2)
-                   + cos(radians(?)) * cos(radians(lat_fixed / {scale_f}))
-                     * pow(sin(radians(lon_fixed / {scale_f} - ?) / 2), 2)
-               )) AS distance_m
-        FROM read_parquet('{path.as_posix()}')
-        WHERE lat_fixed BETWEEN ? AND ?
-          AND lon_fixed BETWEEN ? AND ?
+        SELECT * FROM (
+            SELECT location_id,
+                   lat_fixed / {scale_f} AS lat,
+                   lon_fixed / {scale_f} AS lon,
+                   {gis.distance_m_sql(node, query)} AS distance_m
+            FROM read_parquet('{path.as_posix()}')
+        )
+        WHERE distance_m <= {_MAX_SNAP_M}
         ORDER BY distance_m ASC
         LIMIT {int(k)}
-        """,
-            [
-                lat,
-                lat,
-                lon,
-                lat_fixed - margin,
-                lat_fixed + margin,
-                lon_fixed - margin,
-                lon_fixed + margin,
-            ],
+        """
         )
         .df()
     )
@@ -266,10 +232,10 @@ def nearest(
             frames.append(frame)
 
     if not frames:
-        # Inside a covering cell but no node within the prefilter window: the
-        # point is in a hole in the grid, e.g. inland or past the domain edge.
+        # Inside a covering cell but no node within the snap cap: the point
+        # is in a hole in the grid, e.g. inland or past the domain edge.
         raise errors.PointOutsideDomainError(
-            f"({lat}, {lon}) has no grid node within {_BBOX_MARGIN_DEG} deg",
+            f"({lat}, {lon}) has no grid node within {_MAX_SNAP_M // 1000} km",
             lat=lat,
             lon=lon,
             domains=candidates,

@@ -6,7 +6,8 @@ matter in practice:
 
 * a rejected request (`RequestError`) is worth retrying with different inputs
 * an accepted-then-failed download (`DownloadError`) is not a client problem
-* a `KnownOutageError` will not succeed at all until the service is fixed
+* an `ApiOutageError` means the API backend cannot succeed until the service
+  is fixed (the s3 backend still can)
 
 Messages are one line. Detail belongs in the attributes.
 """
@@ -20,9 +21,7 @@ class WaveHindcastError(Exception):
     """Base class for every error raised by this package."""
 
 
-# --------------------------------------------------------------------------- #
-# Local configuration -- nothing was sent
-# --------------------------------------------------------------------------- #
+# -- Local configuration: nothing was sent --
 
 
 class ConfigurationError(WaveHindcastError):
@@ -41,9 +40,7 @@ class UnknownSiteError(ConfigurationError):
     """No site is configured under that name."""
 
 
-# --------------------------------------------------------------------------- #
-# Location resolution -- offline, before any request
-# --------------------------------------------------------------------------- #
+# -- Location resolution: offline, before any request --
 
 
 class PointOutsideDomainError(WaveHindcastError, ValueError):
@@ -73,9 +70,7 @@ class PointOutsideDomainError(WaveHindcastError, ValueError):
         self.domains = tuple(domains)
 
 
-# --------------------------------------------------------------------------- #
-# The API rejected the request
-# --------------------------------------------------------------------------- #
+# -- The API rejected the request --
 
 
 class RequestError(WaveHindcastError):
@@ -112,13 +107,12 @@ class AuthenticationError(RequestError):
 class RateLimitError(RequestError):
     """Rate limit exceeded (429).
 
-    Limits are 2000/day and one request every 2 s for JSON, with 20 in flight.
     The attribute probe counts as a request.
     """
 
 
 class EndpointNotFoundError(RequestError):
-    """No endpoint at that URL (404) -- usually a wrong dataset slug."""
+    """No endpoint at that URL (404), usually a wrong dataset slug."""
 
 
 class InvalidAttributeError(RequestError):
@@ -168,9 +162,7 @@ class QueueFullError(RequestError):
     """The service is shedding load and refused to queue the job."""
 
 
-# --------------------------------------------------------------------------- #
-# The request was accepted, the data never arrived
-# --------------------------------------------------------------------------- #
+# -- The request was accepted, the data never arrived --
 
 
 class DownloadError(WaveHindcastError):
@@ -193,8 +185,8 @@ class DownloadError(WaveHindcastError):
         self.url = url
 
 
-class KnownOutageError(DownloadError):
-    """The domain is recorded as broken upstream; the request would not complete.
+class ApiOutageError(DownloadError):
+    """The domain's API download service is recorded as broken upstream.
 
     Parameters
     ----------
@@ -234,9 +226,7 @@ class ArchiveFailedError(DownloadError):
     """
 
 
-# --------------------------------------------------------------------------- #
-# Data on disk
-# --------------------------------------------------------------------------- #
+# -- Data on disk --
 
 
 class DataError(WaveHindcastError):
