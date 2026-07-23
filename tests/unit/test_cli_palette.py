@@ -39,7 +39,7 @@ def test_sources_use_only_palette_markup() -> None:
     problems = [
         f"{path.relative_to(_PACKAGE)}:{lineno}: {line.strip()}"
         for path in _source_files()
-        for lineno, line in enumerate(path.read_text().splitlines(), start=1)
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
         if any(p.search(line) for p in (_FORBIDDEN_MARKUP, _FORBIDDEN_STYLE, _BOLD_WHITE))
     ]
     assert not problems, "off-palette styles found:\n" + "\n".join(problems)
@@ -66,6 +66,10 @@ def _violations(text: str) -> list[str]:
     return found
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="rich and click strip ANSI codes on Windows pipes, so color never reaches the capture",
+)
 @pytest.mark.parametrize(
     "args",
     [

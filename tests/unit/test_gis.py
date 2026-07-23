@@ -119,7 +119,7 @@ def test_axis_conventions_stay_in_gis() -> None:
     for path in sorted(package.rglob("*.py")):
         if path.name == "gis.py":
             continue
-        match = st_call.search(path.read_text())
+        match = st_call.search(path.read_text(encoding="utf-8"))
         assert match is None, f"spatial SQL outside the seam: {path} ({match and match.group()})"
 
 
