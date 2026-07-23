@@ -77,11 +77,7 @@ def _do_download(
     from ..sources import resolve_source
 
     ref = resolve_source(uri, aws_profile=aws_profile).ref
-    if ref.scheme == "file":
-        # A local path may use backslashes, which the URI split below misses.
-        name = Path(ref.uri).name or "download"
-    else:
-        name = uri.rstrip("/").rsplit("/", 1)[-1] or "download"
+    name = ref.name or "download"
     dest_dir = output or Path.cwd()
     dest = dest_dir / name
     limit = build_policy(max_download_mb=max_download_mb).max_download

@@ -8,6 +8,7 @@ must not pull in h5py, pyarrow, or numpy.
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 from typing import Literal
 
 Format = Literal["hdf5", "parquet"]
@@ -101,6 +102,20 @@ class SourceRef:
     scheme: Scheme
     display: str
     size: ByteSize | None
+
+    @property
+    def name(self) -> str:
+        """The file's base name, however the source spells its paths.
+
+        Returns
+        -------
+        str
+            The last path component, or an empty string when there is none.
+        """
+        if self.scheme == "file":
+            # A local path may use backslashes, which a URI split misses.
+            return Path(self.uri).name
+        return self.uri.rstrip("/").rsplit("/", 1)[-1]
 
 
 @dataclasses.dataclass(frozen=True)
