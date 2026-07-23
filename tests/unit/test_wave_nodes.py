@@ -14,8 +14,8 @@ PACWAVE = (44.5670485, -124.22896475)
 
 
 def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Compute reference haversine, mirroring the SQL in nodes._query_domain."""
-    radius = 6371008.8
+    """Compute the reference great-circle distance on DuckDB's 6371 km sphere."""
+    radius = 6371000.0
     p1, p2 = math.radians(lat1), math.radians(lat2)
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
@@ -73,6 +73,17 @@ def test_nearest_across_antimeridian(wave_index_dir: Path) -> None:
     assert isinstance(west, WaveNode)
     assert west.domain == "Alaska"
     assert west.location_id == 1  # (52.0005, -179.97)
+
+
+def test_nearest_crosses_antimeridian_for_true_nearest(wave_index_dir: Path) -> None:
+    """The true nearest node wins even when it sits across the dateline."""
+    # From (52.0, -179.999) the eastern node at (51.99, 179.99) is nearer
+    # than the western node at -179.97, but only via the antimeridian.
+    node = nodes.nearest(52.0, -179.999)
+    assert isinstance(node, WaveNode)
+    assert node.location_id == 2  # (51.99, 179.99)
+    expected = _haversine_m(52.0, -179.999, 51.99, 179.99)
+    assert node.distance_m == pytest.approx(expected, rel=1e-6)
 
 
 def test_outside_every_domain_raises(wave_index_dir: Path) -> None:

@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from us_marine_energy_resource.wave_hindcast import errors, index
+from us_marine_energy_resource.wave_hindcast.config import CONFIG
 
 
 @pytest.fixture(autouse=True)
@@ -92,8 +93,8 @@ def test_lfs_pointer_is_not_real(tmp_path: Path) -> None:
 
 def test_checkout_resolves_node_file() -> None:
     """A repo checkout's LFS directory serves the node files directly."""
-    # This test runs inside the repo, where data/wave_index/v1/ holds real
-    # parquet (or LFS pointers, if git-lfs was absent at checkout).
+    # This test runs inside the repo, where data/h2o_wave_hindcast_index/v1/
+    # holds real parquet (or LFS pointers, if git-lfs was absent at checkout).
     path = index._checkout_path("nodes_West_Coast_v1.parquet")
     if path is not None:
         assert path.is_file()
@@ -119,7 +120,7 @@ def test_fetch_via_pooch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     path = index.data_path("nodes_West_Coast_v1.parquet")
     assert path.read_bytes() == b"PAR1data"
     (url, known_hash) = calls[0]
-    assert url == index.DEFAULT_BASE_URL + "nodes_West_Coast_v1.parquet"
+    assert url == CONFIG.index_base_url + "nodes_West_Coast_v1.parquet"
     assert known_hash is not None and known_hash.startswith("sha256:")
 
     # Second call short-circuits on the cached file; no new download.
@@ -173,7 +174,7 @@ def test_generation_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         path = index.data_path("nodes_Alaska_v1.parquet")
     assert built == ["Alaska"]
     assert path.read_bytes() == b"PAR1generated"
-    assert (cache / "wave_index" / "v1" / "nodes_Alaska_v1.parquet.generated").exists()
+    assert (cache / CONFIG.index_subdir / "nodes_Alaska_v1.parquet.generated").exists()
 
     # Subsequent calls use the generated file without another attempt.
     assert index.data_path("nodes_Alaska_v1.parquet") == path
