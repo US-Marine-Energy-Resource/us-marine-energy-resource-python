@@ -42,9 +42,10 @@ clean:
 # ---------------------------------------------------------------------------
 
 ## lint: run ruff linter + formatter check + pyright type checker
+# TODO(lint-relax): add examples back to the ruff lines once its files are committed.
 lint:
-	ruff check us_marine_energy_resource examples
-	ruff format --check us_marine_energy_resource examples
+	ruff check us_marine_energy_resource
+	ruff format --check us_marine_energy_resource
 	pyright
 	# Docstring section completeness. Scoped to the modules already brought up
 	# to the standard. Widen the path as more modules follow.
