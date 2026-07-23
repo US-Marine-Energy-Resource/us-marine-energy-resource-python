@@ -1,0 +1,73 @@
+{
+  "index_version": "v1",
+  "coord_scale": 1000000,
+  "extent_cell_deg": 0.05,
+  "source_bucket": "s3://wpto-pds-us-wave",
+  "source_year": 2010,
+  "extents_file": "domain_extents_v1.parquet",
+  "footprints_file": "domain_footprints_v1.geojson",
+  "node_files": {
+    "West_Coast": "nodes_West_Coast_v1.parquet",
+    "Atlantic": "nodes_Atlantic_v1.parquet",
+    "Alaska": "nodes_Alaska_v1.parquet",
+    "Hawaii": "nodes_Hawaii_v1.parquet",
+    "Gulf_of_Mexico_and_Puerto_Rico": "nodes_Gulf_of_Mexico_and_Puerto_Rico_v1.parquet",
+    "CNMI_and_Guam": "nodes_CNMI_and_Guam_v1.parquet"
+  },
+  "bounds": [
+    {
+      "domain": "West_Coast",
+      "lat_min": 30.090599060058594,
+      "lat_max": 48.86410140991211,
+      "lon_min": -130.07200622558594,
+      "lon_max": -116.88899993896484,
+      "node_count": 699904,
+      "crosses_antimeridian": false
+    },
+    {
+      "domain": "Atlantic",
+      "lat_min": 24.381999969482422,
+      "lat_max": 44.82469940185547,
+      "lon_min": -81.552001953125,
+      "lon_max": -65.72100067138672,
+      "node_count": 2635135,
+      "crosses_antimeridian": false
+    },
+    {
+      "domain": "Alaska",
+      "lat_min": 47.42024230957031,
+      "lat_max": 61.499717712402344,
+      "lon_min": -179.9999237060547,
+      "lon_max": 179.99998474121094,
+      "node_count": 3894283,
+      "crosses_antimeridian": true
+    },
+    {
+      "domain": "Hawaii",
+      "lat_min": 15.0,
+      "lat_max": 27.000001907348633,
+      "lon_min": -164.0,
+      "lon_max": -151.0,
+      "node_count": 700414,
+      "crosses_antimeridian": false
+    },
+    {
+      "domain": "Gulf_of_Mexico_and_Puerto_Rico",
+      "lat_min": 15.6744,
+      "lat_max": 30.6804,
+      "lon_min": -97.853,
+      "lon_max": -63.499,
+      "node_count": 4656637,
+      "crosses_antimeridian": false
+    },
+    {
+      "domain": "CNMI_and_Guam",
+      "lat_min": 10.038686,
+      "lat_max": 24.8705239,
+      "lon_min": 140.432902,
+      "lon_max": 150.454519,
+      "node_count": 461465,
+      "crosses_antimeridian": false
+    }
+  ]
+}
