@@ -309,8 +309,11 @@ def resolve_source(uri: str, aws_profile: str | None = None) -> LocalSource | S3
         A source matching the scheme.
     """
     parsed = urlparse(uri)
-    if parsed.scheme in ("", "file"):
-        return LocalSource(Path(parsed.path if parsed.scheme == "file" else uri))
+    if len(parsed.scheme) < 2:
+        # No scheme, or a Windows drive letter that urlparse mistakes for one.
+        return LocalSource(Path(uri))
+    if parsed.scheme == "file":
+        return LocalSource(Path(parsed.path))
     if parsed.scheme == "s3":
         return S3Source(parsed.netloc, parsed.path.lstrip("/"), aws_profile=aws_profile)
     if parsed.scheme in ("http", "https"):
